@@ -23,9 +23,12 @@
 
       <div id="start-screen" class="screen">
         <h2>Blind Shift</h2>
-        <p class="screen-text">Collect all quantum cubes to unlock the exit.<br>Shifting and grabbing cubes alert the stalker.</p>
-        <button id="start-btn" class="screen-btn" type="button">Start Game</button>
-        <p class="screen-hint">or press Enter</p>
+        <p class="screen-text">Collect all quantum cubes to unlock the exit.<br>Pick a difficulty — Hard keeps the full stalker pressure.</p>
+        <div class="difficulty-row">
+          <button id="easy-btn" class="screen-btn screen-btn-easy" type="button">Easy</button>
+          <button id="hard-btn" class="screen-btn screen-btn-hard" type="button">Hard</button>
+        </div>
+        <p class="screen-hint">Easy: safe shifts · Hard: stalker reacts to shifts &amp; cubes · 1 / 2 keys</p>
       </div>
 
       <div id="game-over-screen" class="screen hidden">
@@ -35,7 +38,7 @@
         <p class="screen-hint">or press Enter</p>
       </div>
     </div>
-    <p class="hint">Move with WASD · Space shifts dimension (stalker reacts) · Cubes draw him closer</p>
+    <p class="hint">Choose Easy or Hard — Hard: stalker reacts to shifts and cubes</p>
   </main>
   <script src="js/audio.js"></script>
   <script src="js/app.js"></script>

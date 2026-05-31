@@ -118,6 +118,26 @@
     background: #3a1818;
   }
 
+  .difficulty-row {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 0.25rem;
+  }
+
+  .screen-btn-easy {
+    min-width: 6.5rem;
+  }
+
+  .screen-btn-hard {
+    min-width: 6.5rem;
+    border-color: #8c3030;
+    background: #3a1818;
+  }
+
+  .screen-btn-hard:hover {
+    background: #4a2020;
+  }
+
   body.blue-dimension .screen-btn {
     border-color: #20205c;
     background: #12182a;

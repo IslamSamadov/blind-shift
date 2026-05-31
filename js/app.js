@@ -6,7 +6,21 @@ const WALL = 1;
 const FLOOR = 0;
 const CUBE = 2;
 const DOOR = 3;
-const LIGHT_RADIUS = 2.5;
+
+const DIFFICULTY = {
+  easy: {
+    label: 'Easy',
+    stalkerMovesOnShift: false,
+    cubeBonusSteps: 0,
+    lightRadius: 3,
+  },
+  hard: {
+    label: 'Hard',
+    stalkerMovesOnShift: true,
+    cubeBonusSteps: 1,
+    lightRadius: 2.5,
+  },
+};
 
 const PLAYER_START = { row: 1, col: 1 };
 const STALKER_START = { row: 9, col: 13 };
@@ -14,7 +28,6 @@ const EXIT_DOOR = { row: 1, col: 13 };
 
 const MIN_CUBES_PER_LAYER = 2;
 const MAX_CUBES_PER_LAYER = 3;
-const STALKER_BONUS_STEPS_ON_CUBE = 1;
 const HIGH_SCORE_KEY = 'blindShiftHighScore';
 const JUMPSCARE_MS = 750;
 
@@ -33,12 +46,19 @@ const startScreen = document.getElementById('start-screen');
 const gameOverScreen = document.getElementById('game-over-screen');
 const gameOverTitle = document.getElementById('game-over-title');
 const gameOverMessage = document.getElementById('game-over-message');
-const startBtn = document.getElementById('start-btn');
 const restartBtn = document.getElementById('restart-btn');
+const easyBtn = document.getElementById('easy-btn');
+const hardBtn = document.getElementById('hard-btn');
 const highScoreEl = document.getElementById('high-score');
 const jumpscare = document.getElementById('jumpscare');
+const hintEl = document.querySelector('.hint');
 
 let pendingGameOver = false;
+let selectedDifficulty = 'hard';
+
+const getDifficultyConfig = (difficulty) => (
+  DIFFICULTY[difficulty] || DIFFICULTY.hard
+);
 
 const getHighScore = () => {
   const stored = localStorage.getItem(HIGH_SCORE_KEY);
@@ -175,20 +195,21 @@ const createEmptySeen = (layerCount) => (
 
 const cloneSeen = (seen) => seen.map((layer) => layer.map((row) => [...row]));
 
-const isInLight = (row, col, playerRow, playerCol) => {
+const isInLight = (row, col, playerRow, playerCol, lightRadius) => {
   const dx = col - playerCol;
   const dy = row - playerRow;
 
-  return Math.sqrt((dx * dx) + (dy * dy)) <= LIGHT_RADIUS;
+  return Math.sqrt((dx * dx) + (dy * dy)) <= lightRadius;
 };
 
 const updateSeen = (gameState) => {
-  const { player, currentLayer, seen } = gameState;
+  const { player, currentLayer, seen, difficulty } = gameState;
+  const { lightRadius } = getDifficultyConfig(difficulty);
   const newSeen = cloneSeen(seen);
 
   for (let row = 0; row < ROWS; row += 1) {
     for (let col = 0; col < COLS; col += 1) {
-      if (isInLight(row, col, player.row, player.col)) {
+      if (isInLight(row, col, player.row, player.col, lightRadius)) {
         newSeen[currentLayer][row][col] = true;
       }
     }
@@ -424,6 +445,7 @@ const createPlayingState = () => {
     score: 0,
     totalCubes: countCubes(map),
     gameStatus: 'playing',
+    difficulty: selectedDifficulty,
     map,
     seen,
   });
@@ -489,7 +511,11 @@ const handleShift = () => {
 
   state = nextState;
   playShiftSound();
-  state = runStalkerTurn(state, 0);
+
+  if (getDifficultyConfig(state.difficulty).stalkerMovesOnShift) {
+    state = runStalkerTurn(state, 0);
+  }
+
   isShiftOnCooldown = true;
   setTimeout(() => {
     isShiftOnCooldown = false;
@@ -503,10 +529,36 @@ const handleShift = () => {
 };
 
 const restartGame = () => {
-  startGame();
+  stopSoundtrack();
+
+  state = createPreviewState();
+
+  gameOverScreen.classList.add('hidden');
+  hud.classList.add('hidden');
+
+  startScreen.classList.remove('hidden');
+
+  updateHint();
 };
 
-const startGame = () => {
+const updateHint = () => {
+  if (state.gameStatus === 'start') {
+    hintEl.textContent = 'Choose Easy or Hard — Hard: stalker reacts to shifts and cubes';
+    return;
+  }
+
+  const config = getDifficultyConfig(state.difficulty);
+
+  if (config.stalkerMovesOnShift) {
+    hintEl.textContent = 'Hard mode · WASD to move · Space shifts (stalker reacts) · Cubes draw him closer';
+    return;
+  }
+
+  hintEl.textContent = 'Easy mode · WASD to move · Space to shift safely · Stalker still hunts on every move';
+};
+
+const startGame = (difficulty = selectedDifficulty) => {
+  selectedDifficulty = difficulty;
   pendingGameOver = false;
   jumpscare.classList.add('hidden');
   state = createPlayingState();
@@ -517,6 +569,7 @@ const startGame = () => {
   gameOverScreen.classList.remove('win', 'lost');
   hud.classList.remove('hidden');
   updateHud();
+  updateHint();
   startSoundtrack();
 };
 
@@ -648,8 +701,9 @@ const checkExit = (gameState) => {
 const updateHud = () => {
   const layerName = LAYER_NAMES[state.currentLayer];
   const exitStatus = allCubesCollected(state) ? 'Exit unlocked' : 'Exit locked';
+  const modeName = getDifficultyConfig(state.difficulty).label;
 
-  hud.textContent = `Cubes: ${state.score} / ${state.totalCubes} | ${layerName} | ${exitStatus} | Best: ${getHighScore()}`;
+  hud.textContent = `Cubes: ${state.score} / ${state.totalCubes} | ${modeName} | ${layerName} | ${exitStatus} | Best: ${getHighScore()}`;
 };
 
 const handleInput = (key) => {
@@ -687,7 +741,8 @@ const handleInput = (key) => {
   state = checkExit(state);
 
   if (state.gameStatus === 'playing') {
-    state = runStalkerTurn(state, collectedCube ? STALKER_BONUS_STEPS_ON_CUBE : 0);
+    const { cubeBonusSteps } = getDifficultyConfig(state.difficulty);
+    state = runStalkerTurn(state, collectedCube ? cubeBonusSteps : 0);
   }
 
   if (state.gameStatus === 'won' || state.gameStatus === 'lost') {
@@ -775,7 +830,8 @@ const renderTile = (row, col, tile, lit, layer) => {
 };
 
 const render = () => {
-  const { currentLayer } = state;
+  const { currentLayer, difficulty } = state;
+  const { lightRadius } = getDifficultyConfig(difficulty);
   const layer = state.map[currentLayer];
   const seenLayer = state.seen[currentLayer];
   const { row: playerRow, col: playerCol } = state.player;
@@ -786,7 +842,7 @@ const render = () => {
 
   for (let row = 0; row < ROWS; row += 1) {
     for (let col = 0; col < COLS; col += 1) {
-      const lit = isInLight(row, col, playerRow, playerCol);
+      const lit = isInLight(row, col, playerRow, playerCol, lightRadius);
       const explored = seenLayer[row][col];
 
       if (!lit && !explored) {
@@ -805,7 +861,7 @@ const render = () => {
     }
   }
 
-  if (isInLight(stalkerRow, stalkerCol, playerRow, playerCol)) {
+  if (isInLight(stalkerRow, stalkerCol, playerRow, playerCol, lightRadius)) {
     renderStalker(stalkerRow, stalkerCol);
   }
 
@@ -818,9 +874,21 @@ const gameLoop = () => {
 };
 
 window.addEventListener('keydown', (event) => {
+  if (state.gameStatus === 'start' && event.key === '1') {
+    event.preventDefault();
+    startGame('easy');
+    return;
+  }
+
+  if (state.gameStatus === 'start' && event.key === '2') {
+    event.preventDefault();
+    startGame('hard');
+    return;
+  }
+
   if (state.gameStatus === 'start' && (event.key === 'Enter' || event.key === ' ')) {
     event.preventDefault();
-    startGame();
+    startGame('hard');
     return;
   }
 
@@ -858,8 +926,10 @@ window.addEventListener('keydown', (event) => {
   }
 });
 
-startBtn.addEventListener('click', startGame);
+easyBtn.addEventListener('click', () => startGame('easy'));
+hardBtn.addEventListener('click', () => startGame('hard'));
 restartBtn.addEventListener('click', restartGame);
 
 updateHighScoreDisplay();
+updateHint();
 gameLoop();
