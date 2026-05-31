@@ -22,6 +22,7 @@ You cannot fight the stalker. You cannot destroy it. Your only weapon is the maz
 | 👾 **Stalker** | A relentless monster that always moves one step toward you each tick. Follows you across dimension shifts. Cannot be killed. |
 | 🔲 **Quantum Cube** | Collectible items scattered across both dimensions. Collect all of them to unlock the exit. |
 | 🚪 **Exit Door** | Locked until all cubes are collected. Reach it to win. |
+| 🧱 **Walls** | The maze structure. Each dimension has its own independent wall layout — a wall in Layer 1 may be open floor in Layer 2, which is the core of the trapping mechanic. |
 
 ---
 
@@ -77,8 +78,9 @@ The game's state is simple and predictable: a 3D array `[layer][row][col]` holds
 ### Key Technical Details
 
 - **Fog of War** — The "flashlight" effect uses a simple distance formula: `√(Δx² + Δy²) ≤ light_radius`. Any tile outside the radius renders as solid black.
-- **Stalker AI** — The monster calculates the difference between its grid coordinates and the player's, then steps one unit closer each tick. No pathfinding needed — the fog of war and maze layout create natural tension.
-- **Dimension Theming** — CSS classes swap the entire canvas color scheme on each phase shift: murky crimson for Layer 1, cold navy blue for Layer 2.
+- **Stalker AI** — The monster calculates the difference between its grid coordinates and the player's, then steps one unit closer each tick. If the direct path is blocked it tries each axis separately, so it navigates around simple obstacles without full pathfinding.
+- **Procedural Maze** — Each game generates a fresh maze per layer using recursive backtracker (DFS), then stamps required tiles and BFS-verifies all paths are reachable.
+- **Dimension Theming** — CSS classes swap the entire canvas color scheme on each phase shift: murky crimson for Layer 1, cold navy blue for Layer 2. The audio engine also switches to a completely different soundtrack per layer.
 
 ---
 
@@ -96,8 +98,7 @@ The game's state is simple and predictable: a 3D array `[layer][row][col]` holds
 
 ## 🐛 Known Bugs / What I'd Fix Next
 
-- **Stalker pathfinding** — The current AI walks through walls because it moves purely by coordinate difference. A proper BFS/A* pathfinding implementation scoped to the current dimension's walls would make it much more threatening and fair.
-- **Cube spawn balance** — Cubes are currently placed manually. A procedural placement system that guarantees at least one cube per dimension per level would improve replayability.
-- **Shift cooldown** — Players can spam Spacebar to permanently trap the Stalker. A short cooldown on phase shifting would force more careful strategy.
-- **Mobile controls** — No touch support currently. On-screen D-pad buttons would make the game playable on mobile.
-- **Level progression** — There is only one hand-crafted maze. Adding procedurally generated levels or a level select screen would extend the experience significantly.
+- **Stalker pathfinding** — The current AI tries both axes when blocked but can still get stuck in complex dead ends. A full BFS/A* pathfinding implementation would make it truly inescapable and fair.
+- **Mobile controls** — No touch support currently. On-screen D-pad buttons would make the game playable on mobile browsers.
+- **Level progression** — There is only one difficulty tier per setting. A proper level system with increasing maze complexity and more cubes per level would extend the experience significantly.
+- **Dimension shift animation** — The switch between dimensions is instant. A brief screen-tear or distortion shader effect would sell the dimensional hop much better visually.

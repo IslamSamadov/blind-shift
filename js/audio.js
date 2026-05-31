@@ -54,7 +54,7 @@ const fireThud = (gainNode, freq, decay = 0.14) => {
 const buildRedLayer = () => {
   const master = audioContext.createGain();
   master.gain.setValueAtTime(0, audioContext.currentTime);
-  master.gain.linearRampToValueAtTime(0.85, audioContext.currentTime + 1.8);
+  master.gain.linearRampToValueAtTime(0.35, audioContext.currentTime + 1.8);
   master.connect(audioContext.destination);
 
   const sources = [];
@@ -133,9 +133,9 @@ const buildRedLayer = () => {
     const hold = 0.5;
     const snapBack = 0.3;
     master.gain.cancelScheduledValues(now);
-    master.gain.linearRampToValueAtTime(1.2, now + rampUp);      // creep up
-    master.gain.linearRampToValueAtTime(1.2, now + rampUp + hold);
-    master.gain.linearRampToValueAtTime(0.75, now + rampUp + hold + snapBack); // snap back
+    master.gain.linearRampToValueAtTime(0.5, now + rampUp);      // creep up
+    master.gain.linearRampToValueAtTime(0.5, now + rampUp + hold);
+    master.gain.linearRampToValueAtTime(0.3, now + rampUp + hold + snapBack); // snap back
     setTimeout(tensionSwell, (rampUp + hold + snapBack + 1.5 + Math.random() * 3) * 1000);
   };
   setTimeout(tensionSwell, 4000);
@@ -196,149 +196,255 @@ const buildRedLayer = () => {
 };
 
 // ─── LAYER 1 — BLUE DIMENSION ────────────────────────────────────────────────
-// Vibe: silent dread chase. You can't hear it as clearly here — but you can
-// FEEL it. Sparse hollow pings, rapid high flutter, your own heartbeat
-// ringing in your ears, and sudden burst of static like it just shifted with you.
+// Vibe: ghostly void. Zero percussion — completely different feel from red.
+// Eerie detuned choir pads, slow crystalline arpeggios, cold wind, distant
+// whale-like moans, and random reversed-whoosh swells. Feels like floating
+// in empty space while something watches you from every direction.
 
 const buildBlueLayer = () => {
   const master = audioContext.createGain();
   master.gain.setValueAtTime(0, audioContext.currentTime);
-  master.gain.linearRampToValueAtTime(0.85, audioContext.currentTime + 1.8);
+  master.gain.linearRampToValueAtTime(0.35, audioContext.currentTime + 3.0); // slower fade in
   master.connect(audioContext.destination);
 
   const sources = [];
   let stopFlag = false;
   const onStop = (fn) => { sources.push({ stop: fn }); };
 
-  // 1. FAST ANXIOUS HEARTBEAT — same pace as red but thinner, echoey, like it's in your head
-  const hbGain = audioContext.createGain();
-  const hbFilter = audioContext.createBiquadFilter();
-  hbFilter.type = 'highpass';
-  hbFilter.frequency.value = 120; // thinner sound
-  hbGain.gain.value = 0.35;
-  hbGain.connect(hbFilter);
-  hbFilter.connect(master);
+  // 1. GHOST CHOIR — four sine voices in a haunted minor cluster, each slowly drifting
+  const choirGain = audioContext.createGain();
+  choirGain.gain.value = 0.12;
+  choirGain.connect(master);
 
-  let hbStopped = false;
-  onStop(() => { hbStopped = true; });
+  [220, 261.6, 277.2, 329.6].forEach((freq, i) => {
+    const osc = audioContext.createOscillator();
+    const lfo = audioContext.createOscillator();
+    const lfoGain = audioContext.createGain();
+    const oscGain = audioContext.createGain();
 
-  const heartbeat = () => {
-    if (hbStopped || !audioContext) return;
-    fireThud(hbGain, 75, 0.10);
-    setTimeout(() => { if (!hbStopped) fireThud(hbGain, 68, 0.08); }, 150);
-    setTimeout(heartbeat, 580 + Math.random() * 100); // slightly faster — more panic
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    lfo.type = 'sine';
+    lfo.frequency.value = 0.05 + i * 0.02; // each voice drifts at its own pace
+    lfoGain.gain.value = 1.8;               // very subtle vibrato
+    oscGain.gain.value = 0.25;
+
+    lfo.connect(lfoGain);
+    lfoGain.connect(osc.frequency);
+    osc.connect(oscGain);
+    oscGain.connect(choirGain);
+    osc.start();
+    lfo.start();
+    sources.push(osc, lfo);
+  });
+
+  // Slowly pulse the choir volume — like it's breathing
+  let choirStopped = false;
+  onStop(() => { choirStopped = true; });
+  const choirBreath = () => {
+    if (choirStopped || !audioContext) return;
+    const now = audioContext.currentTime;
+    choirGain.gain.cancelScheduledValues(now);
+    choirGain.gain.linearRampToValueAtTime(0.18, now + 4 + Math.random() * 3);
+    choirGain.gain.linearRampToValueAtTime(0.06, now + 9 + Math.random() * 4);
+    setTimeout(choirBreath, 10000 + Math.random() * 5000);
   };
-  setTimeout(heartbeat, 300);
+  setTimeout(choirBreath, 2000);
 
-  // 2. HIGH FLUTTER — rapid tremolo sine, like a ringing in the ears from adrenaline
-  const flutterOsc = audioContext.createOscillator();
-  const flutterLfo = audioContext.createOscillator();
-  const flutterLfoGain = audioContext.createGain();
-  const flutterGain = audioContext.createGain();
-  flutterOsc.type = 'sine';
-  flutterOsc.frequency.value = 940;
-  flutterLfo.type = 'sine';
-  flutterLfo.frequency.value = 7.5; // fast tremolo
-  flutterLfoGain.gain.value = 0.025;
-  flutterGain.gain.value = 0.028;
-  flutterLfo.connect(flutterLfoGain);
-  flutterLfoGain.connect(flutterGain.gain);
-  flutterOsc.connect(flutterGain);
-  flutterGain.connect(master);
-  flutterOsc.start();
-  flutterLfo.start();
-  sources.push(flutterOsc, flutterLfo);
+  // 2. CRYSTALLINE ARPEGGIO — slow descending minor arpeggio, like music from another world
+  const arpFreqs = [523.2, 466.2, 440, 392, 349.2, 329.6]; // descending Dm scale
+  let arpIndex = 0;
+  let arpStopped = false;
+  onStop(() => { arpStopped = true; });
 
-  // 3. HOLLOW PINGS — random sparse high pings like sonar, each one closer
-  let pingStopped = false;
-  onStop(() => { pingStopped = true; });
-  let pingInterval = 3800;
-
-  const ping = () => {
-    if (pingStopped || !audioContext) return;
+  const arpNote = () => {
+    if (arpStopped || !audioContext) return;
     const now = audioContext.currentTime;
     const osc = audioContext.createOscillator();
     const g = audioContext.createGain();
     osc.type = 'sine';
-    osc.frequency.value = 1400 + Math.random() * 400;
-    g.gain.setValueAtTime(0.06, now);
-    g.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
+    osc.frequency.value = arpFreqs[arpIndex % arpFreqs.length];
+    arpIndex += 1;
+    g.gain.setValueAtTime(0.0, now);
+    g.gain.linearRampToValueAtTime(0.055, now + 0.08);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 2.2);
     osc.connect(g);
     g.connect(master);
     osc.start(now);
-    osc.stop(now + 1.3);
-    // gradually get more frequent — tension escalates
-    pingInterval = Math.max(1200, pingInterval - 120);
-    setTimeout(ping, pingInterval + Math.random() * 600);
+    osc.stop(now + 2.4);
+    setTimeout(arpNote, 900 + Math.random() * 500);
   };
-  setTimeout(ping, 1800);
+  setTimeout(arpNote, 1500);
 
-  // 4. ICY STATIC UNDERCURRENT — thin highpass noise, constant low presence
-  const staticNoise = createLoopingNoiseNode();
-  const staticFilter = audioContext.createBiquadFilter();
-  const staticGain = audioContext.createGain();
-  staticFilter.type = 'highpass';
-  staticFilter.frequency.value = 3500;
-  staticGain.gain.value = 0.035;
-  staticNoise.connect(staticFilter);
-  staticFilter.connect(staticGain);
-  staticGain.connect(master);
-  staticNoise.start();
-  sources.push(staticNoise);
+  // 3. WHALE MOAN — long slow rising/falling sine, like something enormous far away
+  let whaleStopped = false;
+  onStop(() => { whaleStopped = true; });
 
-  // 5. SUDDEN STATIC BURST — like it just appeared right next to you
-  let burstStopped = false;
-  onStop(() => { burstStopped = true; });
+  const whaleMoan = () => {
+    if (whaleStopped || !audioContext) return;
+    const now = audioContext.currentTime;
+    const osc = audioContext.createOscillator();
+    const g = audioContext.createGain();
+    const filter = audioContext.createBiquadFilter();
+    osc.type = 'sine';
+    const startFreq = 55 + Math.random() * 30;
+    osc.frequency.setValueAtTime(startFreq, now);
+    osc.frequency.linearRampToValueAtTime(startFreq * 1.6, now + 3);
+    osc.frequency.linearRampToValueAtTime(startFreq * 0.8, now + 6);
+    filter.type = 'lowpass';
+    filter.frequency.value = 400;
+    g.gain.setValueAtTime(0, now);
+    g.gain.linearRampToValueAtTime(0.14, now + 1.5);
+    g.gain.linearRampToValueAtTime(0, now + 6.5);
+    osc.connect(filter);
+    filter.connect(g);
+    g.connect(master);
+    osc.start(now);
+    osc.stop(now + 7);
+    setTimeout(whaleMoan, 8000 + Math.random() * 8000);
+  };
+  setTimeout(whaleMoan, 3000);
 
-  const staticBurst = () => {
-    if (burstStopped || !audioContext) return;
+  // 4. COLD WIND — bandpass noise swept slowly, completely different texture from red's scrape
+  const windNoise = createLoopingNoiseNode();
+  const windFilter = audioContext.createBiquadFilter();
+  const windLfo = audioContext.createOscillator();
+  const windLfoGain = audioContext.createGain();
+  const windGain = audioContext.createGain();
+  windFilter.type = 'bandpass';
+  windFilter.frequency.value = 800;
+  windFilter.Q.value = 0.6;
+  windLfo.type = 'sine';
+  windLfo.frequency.value = 0.08; // very slow sweep
+  windLfoGain.gain.value = 600;
+  windLfo.connect(windLfoGain);
+  windLfoGain.connect(windFilter.frequency);
+  windGain.gain.value = 0.04;
+  windNoise.connect(windFilter);
+  windFilter.connect(windGain);
+  windGain.connect(master);
+  windNoise.start();
+  windLfo.start();
+  sources.push(windNoise, windLfo);
+
+  // 5. REVERSE WHOOSH — noise swell that fades IN then cuts, like something rushing at you
+  let whooshStopped = false;
+  onStop(() => { whooshStopped = true; });
+
+  const reverseWhoosh = () => {
+    if (whooshStopped || !audioContext) return;
     const now = audioContext.currentTime;
     const noise = audioContext.createBufferSource();
-    noise.buffer = createNoise(0.15);
+    noise.buffer = createNoise(1.5);
     const f = audioContext.createBiquadFilter();
     const g = audioContext.createGain();
     f.type = 'bandpass';
-    f.frequency.value = 1800 + Math.random() * 1200;
-    f.Q.value = 0.8;
-    g.gain.setValueAtTime(0.22, now);
-    g.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+    f.frequency.value = 400 + Math.random() * 300;
+    f.Q.value = 1.5;
+    // reverse envelope: fade IN (the scary part) then instant cut
+    g.gain.setValueAtTime(0.0, now);
+    g.gain.linearRampToValueAtTime(0.18, now + 1.4);  // build up
+    g.gain.setValueAtTime(0.0, now + 1.45);            // hard cut
     noise.connect(f);
     f.connect(g);
     g.connect(master);
     noise.start(now);
-    setTimeout(staticBurst, 2800 + Math.random() * 4500);
+    setTimeout(reverseWhoosh, 5000 + Math.random() * 7000);
   };
-  setTimeout(staticBurst, 1200);
+  setTimeout(reverseWhoosh, 4000);
 
-  // 6. DEEP THROB — low sine pulse every ~2s, like a presence just under the silence
-  const throbGain = audioContext.createGain();
-  throbGain.gain.value = 0.28;
-  throbGain.connect(master);
+  // 6. HAUNTING PIANO — slow sparse melody in D minor, soft attack/long decay like a real piano key
+  // Uses triangle wave (closest to a muted piano tone) with a sharp attack and long tail
+  const pianoGain = audioContext.createGain();
+  const pianoFilter = audioContext.createBiquadFilter();
+  pianoFilter.type = 'lowpass';
+  pianoFilter.frequency.value = 1800; // warm, not bright
+  pianoFilter.Q.value = 0.5;
+  pianoGain.gain.value = 0.9;
+  pianoGain.connect(pianoFilter);
+  pianoFilter.connect(master);
 
-  let throbStopped = false;
-  onStop(() => { throbStopped = true; });
+  // Dm pentatonic melody — haunting but recognisable as a tune
+  // Pattern repeats with slight variation, feels like a forgotten lullaby
+  const pianoMelody = [
+    { freq: 293.66, dur: 2.8 },  // D4
+    { freq: 261.63, dur: 2.0 },  // C4
+    { freq: 220.00, dur: 3.2 },  // A3
+    { freq: 174.61, dur: 2.4 },  // F3
+    { freq: 196.00, dur: 1.8 },  // G3
+    { freq: 220.00, dur: 2.6 },  // A3
+    { freq: 261.63, dur: 3.0 },  // C4
+    { freq: 246.94, dur: 2.2 },  // B3
+    { freq: 220.00, dur: 4.0 },  // A3 (held)
+    { freq: 0,      dur: 1.5 },  // rest
+    { freq: 174.61, dur: 2.0 },  // F3
+    { freq: 196.00, dur: 2.4 },  // G3
+    { freq: 220.00, dur: 3.5 },  // A3
+    { freq: 0,      dur: 2.0 },  // rest
+  ];
+  let pianoIndex = 0;
+  let pianoStopped = false;
+  onStop(() => { pianoStopped = true; });
 
-  const throb = () => {
-    if (throbStopped || !audioContext) return;
-    fireThud(throbGain, 45, 0.25);
-    setTimeout(throb, 1900 + Math.random() * 400);
+  const pianoNote = () => {
+    if (pianoStopped || !audioContext) return;
+    const note = pianoMelody[pianoIndex % pianoMelody.length];
+    pianoIndex += 1;
+    const noteDur = note.dur + Math.random() * 0.3; // tiny human timing imperfection
+
+    if (note.freq > 0) {
+      const now = audioContext.currentTime;
+      const osc = audioContext.createOscillator();
+      const g = audioContext.createGain();
+
+      // Layer a sine + triangle for a richer piano-like tone
+      const osc2 = audioContext.createOscillator();
+      const g2 = audioContext.createGain();
+      osc.type = 'triangle';
+      osc.frequency.value = note.freq;
+      osc2.type = 'sine';
+      osc2.frequency.value = note.freq * 2; // add a subtle overtone
+      g2.gain.value = 0.15;
+
+      // Piano envelope: fast attack, quick initial decay, long tail
+      g.gain.setValueAtTime(0, now);
+      g.gain.linearRampToValueAtTime(0.55, now + 0.012);  // hard attack
+      g.gain.exponentialRampToValueAtTime(0.18, now + 0.3); // quick decay
+      g.gain.exponentialRampToValueAtTime(0.001, now + note.dur + 1.5); // long tail
+
+      osc.connect(g);
+      osc2.connect(g2);
+      g.connect(pianoGain);
+      g2.connect(pianoGain);
+      osc.start(now);
+      osc2.start(now);
+      osc.stop(now + note.dur + 1.8);
+      osc2.stop(now + note.dur + 1.8);
+    }
+
+    setTimeout(pianoNote, noteDur * 1000);
   };
-  setTimeout(throb, 600);
+  // Delay piano entry so choir establishes first
+  setTimeout(pianoNote, 5000 + Math.random() * 2000);
 
-  // 7. RISING TENSION SWELL — same as red, keeps escalating feel across dimensions
-  let swellStopped = false;
-  onStop(() => { swellStopped = true; });
-
-  const tensionSwell = () => {
-    if (swellStopped || !audioContext) return;
-    const now = audioContext.currentTime;
-    const rampUp = 3.5 + Math.random() * 2.5;
-    master.gain.cancelScheduledValues(now);
-    master.gain.linearRampToValueAtTime(1.15, now + rampUp);
-    master.gain.linearRampToValueAtTime(0.7, now + rampUp + 0.4);
-    setTimeout(tensionSwell, (rampUp + 2 + Math.random() * 3) * 1000);
-  };
-  setTimeout(tensionSwell, 3500);
+  // 7. HIGH GLASS TONE — single sustained very high sine, barely audible, deeply unsettling
+  const glassTone = audioContext.createOscillator();
+  const glassGain = audioContext.createGain();
+  const glassLfo = audioContext.createOscillator();
+  const glassLfoGain = audioContext.createGain();
+  glassTone.type = 'sine';
+  glassTone.frequency.value = 2800;
+  glassLfo.type = 'sine';
+  glassLfo.frequency.value = 0.03; // almost imperceptibly slow
+  glassLfoGain.gain.value = 0.008;
+  glassLfo.connect(glassLfoGain);
+  glassLfoGain.connect(glassGain.gain);
+  glassGain.gain.value = 0.012;
+  glassTone.connect(glassGain);
+  glassGain.connect(master);
+  glassTone.start();
+  glassLfo.start();
+  sources.push(glassTone, glassLfo);
 
   onStop(() => { stopFlag = true; });
 
