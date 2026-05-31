@@ -28,6 +28,7 @@ const gameOverScreen = document.getElementById('game-over-screen');
 const gameOverTitle = document.getElementById('game-over-title');
 const gameOverMessage = document.getElementById('game-over-message');
 const startBtn = document.getElementById('start-btn');
+const restartBtn = document.getElementById('restart-btn');
 
 const cloneMap = (map) => map.map((layer) => layer.map((row) => [...row]));
 
@@ -67,6 +68,10 @@ const createPreviewState = () => ({
 });
 
 let state = createPreviewState();
+
+const restartGame = () => {
+  startGame();
+};
 
 const startGame = () => {
   state = createPlayingState();
@@ -296,6 +301,13 @@ window.addEventListener('keydown', (event) => {
     return;
   }
 
+  if ((state.gameStatus === 'won' || state.gameStatus === 'lost')
+    && (event.key === 'Enter' || event.key === ' ' || event.key === 'r' || event.key === 'R')) {
+    event.preventDefault();
+    restartGame();
+    return;
+  }
+
   const movementKeys = [
     'ArrowUp',
     'ArrowDown',
@@ -318,5 +330,6 @@ window.addEventListener('keydown', (event) => {
 });
 
 startBtn.addEventListener('click', startGame);
+restartBtn.addEventListener('click', restartGame);
 
 gameLoop();

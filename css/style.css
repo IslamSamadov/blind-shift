@@ -81,7 +81,7 @@
     opacity: 0.55;
   }
 
-  #start-btn {
+  .screen-btn {
     margin-top: 0.25rem;
     padding: 0.65rem 1.5rem;
     border: 1px solid #5c2020;
@@ -93,7 +93,7 @@
     cursor: pointer;
   }
 
-  #start-btn:hover {
+  .screen-btn:hover {
     background: #3a1818;
   }
 
