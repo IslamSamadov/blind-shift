@@ -35,35 +35,35 @@ I guided the AI to pivot toward a 2D perspective-shifting game with an atmospher
 
 ---
 
-### [May 31, 2026] - Stalker walked through walls
+### May 31, 2026 - Stalker walked through walls
 
-**What I asked the AI:** "Write the stalker movement function. It should move one step toward the player every tick."
+**What I asked the AI:** "Add the stalker — it should move one step toward me after every move I make."
 
-**What it gave me:** A function that calculated `dx = playerX - stalkerX` and `dy = playerY - stalkerY`, then moved the stalker one step in whichever direction had the larger difference (Chebyshev-style movement).
+**What it gave me:** A `moveStalker()` function in `app.js` that picked the direction with the bigger distance gap (`Math.sign(dRow)` / `Math.sign(dCol)`) and updated the stalker's row/col without reading the map first.
 
-**What was wrong:** The stalker completely ignored walls. It would slide through any wall tile in the current dimension because the function never checked whether the target tile was passable before moving. The stalker could teleport through entire wall sections and instantly reach the player.
+**What was wrong:** In testing, the stalker cut straight through maze walls in the Red dimension and caught me in places that should have been safe. It felt broken, not scary.
 
-**How I fixed it:** I added a wall check before applying the move. I read the `map[currentLayer][newRow][newCol]` value first and only updated the stalker's position if that tile was not a wall (`!== 1`). If the direct path was blocked I tried moving on just one axis at a time as a fallback.
+**How I fixed it:** I reused the same wall check the player already had. Before moving, the stalker now reads `map[currentLayer][newRow][newCol]` and only steps if the tile is not a wall. If the direct path is blocked, it tries moving on a single axis instead.
 
 **Time lost:** ~25 minutes
 
 ---
 
-### [May 31, 2026] - Phase shift triggered every frame while holding Spacebar
+### May 31, 2026 - Phase shift spammed while holding Spacebar
 
-**What I asked the AI:** "Handle keyboard input for movement and phase shifting."
+**What I asked the AI:** "Wire up Spacebar so the player can shift between Red and Blue."
 
-**What it gave me:** An event listener on `keydown` that checked `if (e.key === ' ') shiftDimension()` inside the main game loop.
+**What it gave me:** Shift logic hooked up correctly, but every `keydown` event for Space fired another shift with no delay between them.
 
-**What was wrong:** Holding Spacebar for even half a second fired the shift dozens of times per second, rapidly flickering between dimensions. The stalker also teleported unpredictably because its position was being recalculated on every shift. The game became unplayable.
+**What was wrong:** Holding Spacebar for half a second flipped dimensions dozens of times. The HUD flickered between "Red" and "Blue", the canvas colors strobed, and the stalker's position kept getting recalculated — the game was unplayable.
 
-**How I fixed it:** I moved the Spacebar listener outside the game loop into a one-time `addEventListener('keydown', ...)` and added a boolean flag `isShiftOnCooldown`. After each shift I set it to `true` and used `setTimeout` to reset it after 300ms, preventing spam.
+**How I fixed it:** I kept the listener in `keydown` but added an `isShiftOnCooldown` flag in `app.js`. After a successful shift it locks input for 300ms via `setTimeout`, same idea I had written about in my notes from earlier AI sessions.
 
-**Time lost:** ~20 minutes
+**Time lost:** ~15 minutes
 
 ---
 
-### [May 31, 2026] - Phase shift made stalker spawn in walls
+### May 31, 2026 - Phase shift made stalker spawn in walls
 
 **What I asked the AI:** "Implement layer shifting with Spacebar."
 
@@ -77,14 +77,28 @@ I guided the AI to pivot toward a 2D perspective-shifting game with an atmospher
 
 ---
 
-### [May 31, 2026] - Exit door unlocked before all cubes were collected
+### May 31, 2026 - Won the game without reaching the exit door
 
-**What I asked the AI:** "Write the win condition check — the exit should unlock when all cubes are collected."
+**What I asked the AI:** "Add the exit door from the README — locked until all cubes are collected."
 
-**What it gave me:** A check that counted cubes remaining in the `map` array and unlocked the exit when the count hit zero.
+**What it gave me:** A door tile rendered on the map, but the win check still lived inside `collectCube()`. Picking up the last cube immediately set `gameStatus` to `'won'`.
 
-**What was wrong:** The cube count only checked the *current* layer. If I was in Layer 1 and had collected all Layer 1 cubes, the exit unlocked even though Layer 2 cubes were still sitting there. I could win the game without collecting half the cubes.
+**What was wrong:** That skipped the whole escape part of the design. I could win standing in the middle of the maze as long as I had grabbed every cube. The locked door was cosmetic.
 
-**How I fixed it:** I changed the count function to loop over both layers: `map[0]` and `map[1]`. The exit only unlocks when the total cube count across all layers reaches zero.
+**How I fixed it:** I split the logic. Collecting cubes only updates `score` and unlocks the door through `isWalkable()`. A separate `checkExit()` runs after each move and only sets `'won'` when all cubes are collected **and** the player is standing on the door tile in the current layer.
 
-**Time lost:** ~15 minutes
+**Time lost:** ~12 minutes
+
+---
+
+### May 31, 2026 - Cubes were hard-coded and every run felt the same
+
+**What I asked the AI:** "Cubes are placed manually in the map arrays — can we randomize spawn locations so replays aren't identical?"
+
+**What it gave me:** Quantum cubes baked directly into `LAYER_0` and `LAYER_1` as literal `2` values in the 2D arrays. Same spots every restart.
+
+**What was wrong:** After two or three playthroughs I had memorized the Red and Blue cube locations. The fog and stalker were tense, but the puzzle itself stopped changing. My README even listed manual cube placement as something to fix.
+
+**How I fixed it:** I removed all cube values from the static maze templates and added `placeRandomCubes()` in `app.js`. On each new game it shuffles open floor tiles per layer, skips the player spawn, stalker spawn, and exit door, and drops 2–3 cubes in each dimension. `totalCubes` is counted after placement so the HUD and win condition stay in sync.
+
+**Time lost:** ~18 minutes

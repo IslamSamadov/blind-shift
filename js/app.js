@@ -12,15 +12,18 @@ const PLAYER_START = { row: 1, col: 1 };
 const STALKER_START = { row: 9, col: 13 };
 const EXIT_DOOR = { row: 1, col: 13 };
 
+const MIN_CUBES_PER_LAYER = 2;
+const MAX_CUBES_PER_LAYER = 3;
+
 const LAYER_0 = [
   [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-  [1, 0, 0, 2, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 3],
+  [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 3],
   [1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1],
   [1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1],
   [1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1],
-  [1, 0, 2, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1],
+  [1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1],
   [1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1],
-  [1, 0, 0, 0, 0, 0, 1, 0, 2, 0, 0, 0, 0, 0, 1],
+  [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1],
   [1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1],
   [1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
   [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
@@ -28,15 +31,15 @@ const LAYER_0 = [
 
 const LAYER_1 = [
   [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-  [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 3],
+  [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
   [1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1],
   [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
   [1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1],
-  [1, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 1],
+  [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
   [1, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1],
   [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
   [1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1],
-  [1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 1],
+  [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
   [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
 ];
 
@@ -182,8 +185,67 @@ const countCubes = (map) => {
   return total;
 };
 
+const getReservedTiles = () => {
+  const reserved = new Set();
+
+  [PLAYER_START, STALKER_START, EXIT_DOOR].forEach(({ row, col }) => {
+    reserved.add(`${row},${col}`);
+  });
+
+  return reserved;
+};
+
+const shuffleTiles = (tiles) => {
+  const shuffled = [...tiles];
+
+  for (let i = shuffled.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+
+  return shuffled;
+};
+
+const getOpenFloorTiles = (map, layer, reserved) => {
+  const tiles = [];
+
+  for (let row = 0; row < ROWS; row += 1) {
+    for (let col = 0; col < COLS; col += 1) {
+      if (map[layer][row][col] !== FLOOR) {
+        continue;
+      }
+
+      if (reserved.has(`${row},${col}`)) {
+        continue;
+      }
+
+      tiles.push({ row, col });
+    }
+  }
+
+  return tiles;
+};
+
+const placeRandomCubes = (map) => {
+  const newMap = cloneMap(map);
+  const reserved = getReservedTiles();
+
+  newMap.forEach((_, layerIndex) => {
+    const cubeCount = MIN_CUBES_PER_LAYER
+      + Math.floor(Math.random() * (MAX_CUBES_PER_LAYER - MIN_CUBES_PER_LAYER + 1));
+    const floorTiles = shuffleTiles(getOpenFloorTiles(newMap, layerIndex, reserved));
+
+    for (let i = 0; i < Math.min(cubeCount, floorTiles.length); i += 1) {
+      const { row, col } = floorTiles[i];
+      newMap[layerIndex][row][col] = CUBE;
+    }
+  });
+
+  return newMap;
+};
+
 const createPlayingState = () => {
-  const map = cloneMap([LAYER_0, LAYER_1]);
+  const map = placeRandomCubes(cloneMap([LAYER_0, LAYER_1]));
   const seen = createEmptySeen(map.length);
 
   if (!isNotWall(map, 0, PLAYER_START.row, PLAYER_START.col)) {
