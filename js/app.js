@@ -11,15 +11,37 @@ const LAYER_0 = [
   [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
   [1, 0, 0, 2, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1],
   [1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1],
-  [1, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 1, 0, 1],
+  [1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1],
   [1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1],
-  [1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1],
+  [1, 0, 2, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1],
   [1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1],
   [1, 0, 0, 0, 0, 0, 1, 0, 2, 0, 0, 0, 0, 0, 1],
   [1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1],
-  [1, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 0, 0, 1],
+  [1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
   [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
 ];
+
+const LAYER_1 = [
+  [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+  [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 1],
+  [1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1],
+  [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+  [1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1],
+  [1, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 1],
+  [1, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1],
+  [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+  [1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1],
+  [1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 1],
+  [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+];
+
+const LAYER_NAMES = ['Red', 'Blue'];
+const SHIFT_COOLDOWN_MS = 300;
+
+const TILE_COLORS = {
+  0: { wallLit: '#5c2020', wallDim: '#241010', floorLit: '#2a1212', floorDim: '#140909' },
+  1: { wallLit: '#20305c', wallDim: '#101828', floorLit: '#12182a', floorDim: '#090d14' },
+};
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -80,7 +102,7 @@ const countCubes = (map) => {
 };
 
 const createPlayingState = () => {
-  const map = cloneMap([LAYER_0]);
+  const map = cloneMap([LAYER_0, LAYER_1]);
   const seen = createEmptySeen(map.length);
 
   return updateSeen({
@@ -101,6 +123,61 @@ const createPreviewState = () => ({
 });
 
 let state = createPreviewState();
+let isShiftOnCooldown = false;
+
+const applyDimensionTheme = (layer) => {
+  document.body.classList.toggle('red-dimension', layer === 0);
+  document.body.classList.toggle('blue-dimension', layer === 1);
+};
+
+const canShift = (gameState) => {
+  const nextLayer = gameState.currentLayer === 0 ? 1 : 0;
+  const { row, col } = gameState.player;
+
+  return gameState.map[nextLayer][row][col] !== WALL;
+};
+
+const shiftDimension = (gameState) => {
+  if (!canShift(gameState)) {
+    return gameState;
+  }
+
+  const nextLayer = gameState.currentLayer === 0 ? 1 : 0;
+  let newState = {
+    ...gameState,
+    currentLayer: nextLayer,
+  };
+
+  newState = updateSeen(newState);
+  applyDimensionTheme(nextLayer);
+  newState = checkStalkerCollision(newState);
+
+  return newState;
+};
+
+const handleShift = () => {
+  if (state.gameStatus !== 'playing' || isShiftOnCooldown) {
+    return;
+  }
+
+  const nextState = shiftDimension(state);
+
+  if (nextState === state) {
+    return;
+  }
+
+  state = nextState;
+  isShiftOnCooldown = true;
+  setTimeout(() => {
+    isShiftOnCooldown = false;
+  }, SHIFT_COOLDOWN_MS);
+
+  if (state.gameStatus === 'won' || state.gameStatus === 'lost') {
+    showGameOver();
+  }
+
+  updateHud();
+};
 
 const restartGame = () => {
   startGame();
@@ -108,6 +185,8 @@ const restartGame = () => {
 
 const startGame = () => {
   state = createPlayingState();
+  isShiftOnCooldown = false;
+  applyDimensionTheme(0);
   startScreen.classList.add('hidden');
   gameOverScreen.classList.add('hidden');
   gameOverScreen.classList.remove('win', 'lost');
@@ -214,7 +293,8 @@ const collectCube = (gameState) => {
 };
 
 const updateHud = () => {
-  hud.textContent = `Cubes: ${state.score} / ${state.totalCubes}`;
+  const layerName = LAYER_NAMES[state.currentLayer];
+  hud.textContent = `Cubes: ${state.score} / ${state.totalCubes} | ${layerName} Dimension`;
 };
 
 const handleInput = (key) => {
@@ -289,27 +369,29 @@ const renderCube = (row, col) => {
   ctx.strokeRect(x - size, y - size, size * 2, size * 2);
 };
 
-const renderTile = (row, col, tile, lit) => {
+const renderTile = (row, col, tile, lit, layer) => {
   const x = col * TILE;
   const y = row * TILE;
+  const colors = TILE_COLORS[layer];
 
   if (tile === WALL) {
-    ctx.fillStyle = lit ? '#5c2020' : '#241010';
+    ctx.fillStyle = lit ? colors.wallLit : colors.wallDim;
   } else {
-    ctx.fillStyle = lit ? '#2a1212' : '#140909';
+    ctx.fillStyle = lit ? colors.floorLit : colors.floorDim;
   }
 
   ctx.fillRect(x, y, TILE, TILE);
 
   if (lit) {
-    ctx.strokeStyle = '#1a0a0a';
+    ctx.strokeStyle = layer === 0 ? '#1a0a0a' : '#0a0a1a';
     ctx.strokeRect(x, y, TILE, TILE);
   }
 };
 
 const render = () => {
-  const layer = state.map[state.currentLayer];
-  const seenLayer = state.seen[state.currentLayer];
+  const { currentLayer } = state;
+  const layer = state.map[currentLayer];
+  const seenLayer = state.seen[currentLayer];
   const { row: playerRow, col: playerCol } = state.player;
   const { row: stalkerRow, col: stalkerCol } = state.stalker;
 
@@ -325,7 +407,7 @@ const render = () => {
         continue;
       }
 
-      renderTile(row, col, layer[row][col], lit);
+      renderTile(row, col, layer[row][col], lit, currentLayer);
 
       if (lit && layer[row][col] === CUBE) {
         renderCube(row, col);
@@ -377,6 +459,12 @@ window.addEventListener('keydown', (event) => {
   if (movementKeys.includes(event.key)) {
     event.preventDefault();
     handleInput(event.key);
+    return;
+  }
+
+  if (event.key === ' ' && state.gameStatus === 'playing') {
+    event.preventDefault();
+    handleShift();
   }
 });
 

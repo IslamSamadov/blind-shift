@@ -46,3 +46,17 @@ I guided the AI to pivot toward a 2D perspective-shifting game with an atmospher
 **How I fixed it:** I added a wall check before applying the move. I read the `map[currentLayer][newRow][newCol]` value first and only updated the stalker's position if that tile was not a wall (`!== 1`). If the direct path was blocked I tried moving on just one axis at a time as a fallback.
 
 **Time lost:** ~25 minutes
+
+---
+
+### [Date] - Phase shift triggered every frame while holding Spacebar
+
+**What I asked the AI:** "Handle keyboard input for movement and phase shifting."
+
+**What it gave me:** An event listener on `keydown` that checked `if (e.key === ' ') shiftDimension()` inside the main game loop.
+
+**What was wrong:** Holding Spacebar for even half a second fired the shift dozens of times per second, rapidly flickering between dimensions. The stalker also teleported unpredictably because its position was being recalculated on every shift. The game became unplayable.
+
+**How I fixed it:** I moved the Spacebar listener outside the game loop into a one-time `addEventListener('keydown', ...)` and added a boolean flag `isShiftOnCooldown`. After each shift I set it to `true` and used `setTimeout` to reset it after 300ms, preventing spam.
+
+**Time lost:** ~20 minutes

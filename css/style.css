@@ -17,6 +17,11 @@
   body.red-dimension {
     background-color: #1a0a0a;
   }
+
+  body.blue-dimension {
+    background-color: #0a0a1a;
+    color: #e6e6f0;
+  }
   
   main {
     text-align: center;
@@ -51,6 +56,10 @@
     image-rendering: pixelated;
   }
 
+  body.blue-dimension #game {
+    border-color: #20205c;
+  }
+
   .screen {
     position: absolute;
     inset: 0;
@@ -63,6 +72,11 @@
     background: rgba(13, 5, 5, 0.94);
     border: 2px solid #5c2020;
     text-align: center;
+  }
+
+  body.blue-dimension .screen {
+    background: rgba(5, 5, 13, 0.94);
+    border-color: #20205c;
   }
 
   .screen h2 {
@@ -95,6 +109,15 @@
 
   .screen-btn:hover {
     background: #3a1818;
+  }
+
+  body.blue-dimension .screen-btn {
+    border-color: #20205c;
+    background: #12182a;
+  }
+
+  body.blue-dimension .screen-btn:hover {
+    background: #181e3a;
   }
 
   #game-over-screen.win h2 {
