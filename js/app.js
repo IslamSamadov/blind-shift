@@ -25,6 +25,8 @@ const ctx = canvas.getContext('2d');
 const createInitialState = () => ({
   currentLayer: 0,
   player: { row: 1, col: 1 },
+  stalker: { row: 9, col: 13 },
+  caught: false,
   map: [LAYER_0],
 });
 
@@ -38,19 +40,57 @@ const isPassable = (layer, row, col) => {
   return state.map[layer][row][col] !== WALL;
 };
 
-const movePlayer = (dRow, dCol) => {
-  const { row, col } = state.player;
+const movePlayer = (gameState, dRow, dCol) => {
+  const { row, col } = gameState.player;
   const nextRow = row + dRow;
   const nextCol = col + dCol;
 
-  if (!isPassable(state.currentLayer, nextRow, nextCol)) {
-    return state;
+  if (!isPassable(gameState.currentLayer, nextRow, nextCol)) {
+    return gameState;
   }
 
   return {
-    ...state,
+    ...gameState,
     player: { row: nextRow, col: nextCol },
   };
+};
+
+const moveStalker = (gameState) => {
+  const { player, stalker, currentLayer } = gameState;
+  const dRow = player.row - stalker.row;
+  const dCol = player.col - stalker.col;
+
+  if (dRow === 0 && dCol === 0) {
+    return gameState;
+  }
+
+  const attempts = Math.abs(dRow) >= Math.abs(dCol)
+    ? [[Math.sign(dRow), 0], [0, Math.sign(dCol)]]
+    : [[0, Math.sign(dCol)], [Math.sign(dRow), 0]];
+
+  for (const [stepRow, stepCol] of attempts) {
+    const nextRow = stalker.row + stepRow;
+    const nextCol = stalker.col + stepCol;
+
+    if (isPassable(currentLayer, nextRow, nextCol)) {
+      return {
+        ...gameState,
+        stalker: { row: nextRow, col: nextCol },
+      };
+    }
+  }
+
+  return gameState;
+};
+
+const checkStalkerCollision = (gameState) => {
+  const { player, stalker } = gameState;
+
+  if (player.row === stalker.row && player.col === stalker.col) {
+    return { ...gameState, caught: true };
+  }
+
+  return gameState;
 };
 
 const handleInput = (key) => {
@@ -70,18 +110,44 @@ const handleInput = (key) => {
   };
 
   const delta = moves[key];
-  if (!delta) {
+  if (!delta || state.caught) {
     return;
   }
 
-  state = movePlayer(delta[0], delta[1]);
+  state = movePlayer(state, delta[0], delta[1]);
+  state = moveStalker(state);
+  state = checkStalkerCollision(state);
+};
+
+const drawEntity = (row, col, color, radius = TILE / 3) => {
+  const x = col * TILE + TILE / 2;
+  const y = row * TILE + TILE / 2;
+
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.fill();
+};
+
+const renderStalker = (row, col) => {
+  drawEntity(row, col, '#1a1028');
+
+  const x = col * TILE + TILE / 2;
+  const y = row * TILE + TILE / 2;
+
+  ctx.fillStyle = '#ff4444';
+  ctx.beginPath();
+  ctx.arc(x - 4, y - 2, 3, 0, Math.PI * 2);
+  ctx.arc(x + 4, y - 2, 3, 0, Math.PI * 2);
+  ctx.fill();
 };
 
 const render = () => {
   const layer = state.map[state.currentLayer];
   const { row: playerRow, col: playerCol } = state.player;
+  const { row: stalkerRow, col: stalkerCol } = state.stalker;
 
-  ctx.fillStyle = '#0d0505';
+  ctx.fillStyle = state.caught ? '#3a0808' : '#0d0505';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   for (let row = 0; row < ROWS; row += 1) {
@@ -101,13 +167,17 @@ const render = () => {
     }
   }
 
-  const playerX = playerCol * TILE;
-  const playerY = playerRow * TILE;
+  renderStalker(stalkerRow, stalkerCol);
+  drawEntity(playerRow, playerCol, '#f5d76e');
 
-  ctx.fillStyle = '#f5d76e';
-  ctx.beginPath();
-  ctx.arc(playerX + TILE / 2, playerY + TILE / 2, TILE / 3, 0, Math.PI * 2);
-  ctx.fill();
+  if (state.caught) {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#ff6666';
+    ctx.font = 'bold 28px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Caught!', canvas.width / 2, canvas.height / 2);
+  }
 };
 
 const gameLoop = () => {
