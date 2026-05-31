@@ -91,6 +91,7 @@ const showJumpscare = (callback) => {
 const finishGame = () => {
   if (pendingGameOver) return;
   pendingGameOver = true;
+  cancelLunge();
   stopSoundtrack();
 
   if (state.gameStatus === 'lost') {
@@ -394,6 +395,7 @@ const createPlayingState = () => {
     currentLayer: 0,
     player: { ...PLAYER_START },
     stalker,
+    stalkerDimensionLocked: false, // dimension memory: stalker stays in other layer
     score: 0,
     totalCubes: countCubes(map),
     gameStatus: 'playing',
@@ -439,31 +441,51 @@ const shiftDimension = (gameState) => {
   if (!canShift(gameState)) return gameState;
 
   const nextLayer = gameState.currentLayer === 0 ? 1 : 0;
-  const { stalker, map, player } = gameState;
+  const { stalker, map, player, stalkerDimensionLocked } = gameState;
 
-  // FIX 2: pass player position into resolve so stalker BFS skips the player's tile
-  const resolvedStalker = resolveStalkerPosition(
-    map, nextLayer,
-    stalker.row, stalker.col,
-    player.row, player.col,
-  );
+  // ── Dimension Memory ────────────────────────────────────────────────────────
+  // If the stalker is already locked in the other dimension, shifting back
+  // releases it — it snaps to the nearest open tile in the new current layer.
+  // If it's not locked, there's a 30% chance it stays behind (memory trigger).
+  // On easy mode, dimension memory never triggers.
+  const config = getDifficultyConfig(gameState.difficulty);
+  let newStalkerLocked = false;
+  let resolvedStalker;
+
+  if (stalkerDimensionLocked) {
+    // Stalker was in the other dimension — it re-enters current play layer
+    newStalkerLocked = false;
+    resolvedStalker = resolveStalkerPosition(
+      map, nextLayer, stalker.row, stalker.col, player.row, player.col,
+    );
+  } else if (config.stalkerMovesOnShift && Math.random() < 0.30) {
+    // Dimension memory: stalker stays in the old layer — player escapes alone
+    newStalkerLocked = true;
+    // Stalker keeps its current position (it's now in the "other" dimension)
+    resolvedStalker = { ...stalker };
+    if (typeof onStalkerMemory === 'function') onStalkerMemory();
+  } else {
+    // Normal shift — stalker follows
+    newStalkerLocked = false;
+    resolvedStalker = resolveStalkerPosition(
+      map, nextLayer, stalker.row, stalker.col, player.row, player.col,
+    );
+  }
 
   let newState = {
     ...gameState,
     currentLayer: nextLayer,
     stalker: resolvedStalker,
+    stalkerDimensionLocked: newStalkerLocked,
   };
 
   newState = updateSeen(newState);
   applyDimensionTheme(nextLayer);
 
-  // Check stalker collision first (stalker may have resolved onto player tile
-  // even after the fix in edge cases where all nearby tiles are the player's)
   newState = checkStalkerCollision(newState);
   if (newState.gameStatus !== 'playing') return newState;
 
-  // FIX 1: collect cube and check exit after shifting — player may have
-  // landed on a cube tile in the new dimension
+  // FIX 1: collect cube and check exit after shifting
   const scoreBeforeShiftCube = newState.score;
   newState = collectCube(newState);
   if (newState.score > scoreBeforeShiftCube) {
@@ -471,6 +493,11 @@ const shiftDimension = (gameState) => {
     updateHud();
   }
   newState = checkExit(newState);
+
+  // Update proximity audio after shift
+  if (typeof setStalkerProximity === 'function') {
+    setStalkerProximity(stalkerDistance(newState));
+  }
 
   return newState;
 };
@@ -506,6 +533,7 @@ const handleShift = () => {
 
 const restartGame = () => {
   stopSoundtrack();
+  cancelLunge();
   state = createPreviewState();
   gameOverScreen.classList.add('hidden');
   hud.classList.add('hidden');
@@ -540,6 +568,7 @@ const startGame = (difficulty = selectedDifficulty) => {
   updateHud();
   updateHint();
   startSoundtrack();
+  scheduleLunge();
 };
 
 const showGameOver = () => {
@@ -577,34 +606,120 @@ const movePlayer = (gameState, dRow, dCol) => {
   return { ...gameState, player: { row: nextRow, col: nextCol } };
 };
 
-const moveStalker = (gameState) => {
-  const { player, stalker, currentLayer } = gameState;
-  const dRow = player.row - stalker.row;
-  const dCol = player.col - stalker.col;
-  if (dRow === 0 && dCol === 0) return gameState;
+// ── BFS pathfinding ───────────────────────────────────────────────────────────
+// Returns the first step the stalker should take toward the player,
+// respecting walls of the current layer. Falls back to the old greedy
+// move if BFS finds no path (shouldn't happen in a connected maze).
+const bfsNextStep = (gameState) => {
+  const { player, stalker, currentLayer, map, score, totalCubes } = gameState;
+  const startRow = stalker.row;
+  const startCol = stalker.col;
+  const goalRow  = player.row;
+  const goalCol  = player.col;
 
-  const attempts = Math.abs(dRow) >= Math.abs(dCol)
-    ? [[Math.sign(dRow), 0], [0, Math.sign(dCol)]]
-    : [[0, Math.sign(dCol)], [Math.sign(dRow), 0]];
+  if (startRow === goalRow && startCol === goalCol) return null;
 
-  for (const [stepRow, stepCol] of attempts) {
-    const nextRow = stalker.row + stepRow;
-    const nextCol = stalker.col + stepCol;
-    if (isPassable(currentLayer, nextRow, nextCol)) {
-      return { ...gameState, stalker: { row: nextRow, col: nextCol } };
+  const key = (r, c) => `${r},${c}`;
+  const visited = new Map(); // key → parent key
+  visited.set(key(startRow, startCol), null);
+  let frontier = [[startRow, startCol]];
+
+  const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+
+  while (frontier.length > 0) {
+    const next = [];
+    for (const [r, c] of frontier) {
+      for (const [dr, dc] of dirs) {
+        const nr = r + dr;
+        const nc = c + dc;
+        const k = key(nr, nc);
+        if (visited.has(k)) continue;
+        // stalker can walk through doors regardless of lock state
+        if (!isInBounds(nr, nc)) continue;
+        if (map[currentLayer][nr][nc] === WALL) continue;
+        visited.set(k, key(r, c));
+        if (nr === goalRow && nc === goalCol) {
+          // Trace back to find the first step from start
+          let cur = k;
+          let prev = visited.get(cur);
+          while (prev !== key(startRow, startCol)) {
+            cur = prev;
+            prev = visited.get(cur);
+          }
+          const [stepR, stepC] = cur.split(',').map(Number);
+          return { row: stepR, col: stepC };
+        }
+        next.push([nr, nc]);
+      }
     }
+    frontier = next;
   }
 
-  return gameState;
+  // Fallback: greedy step (maze should always be connected)
+  const dRow = Math.sign(goalRow - startRow);
+  const dCol = Math.sign(goalCol - startCol);
+  for (const [sr, sc] of (Math.abs(goalRow - startRow) >= Math.abs(goalCol - startCol)
+    ? [[dRow, 0], [0, dCol]] : [[0, dCol], [dRow, 0]])) {
+    const nr = startRow + sr;
+    const nc = startCol + sc;
+    if (isWalkable(map, currentLayer, nr, nc, score, totalCubes)) {
+      return { row: nr, col: nc };
+    }
+  }
+  return null;
+};
+
+const moveStalker = (gameState) => {
+  // If the stalker is in dimension memory mode (locked in other layer), skip movement
+  if (gameState.stalkerDimensionLocked) return gameState;
+
+  const next = bfsNextStep(gameState);
+  if (!next) return gameState;
+  return { ...gameState, stalker: next };
 };
 
 const checkStalkerCollision = (gameState) => {
-  const { player, stalker } = gameState;
+  const { player, stalker, stalkerDimensionLocked } = gameState;
+  // If stalker is dimension-locked it's in the other layer — can't catch you
+  if (stalkerDimensionLocked) return gameState;
   if (player.row === stalker.row && player.col === stalker.col) {
     return { ...gameState, gameStatus: 'lost' };
   }
   return gameState;
 };
+
+// ── Stalker distance ──────────────────────────────────────────────────────────
+const stalkerDistance = (gameState) => {
+  const { player, stalker, stalkerDimensionLocked } = gameState;
+  if (stalkerDimensionLocked) return 999; // in other dimension — far away
+  return Math.abs(player.row - stalker.row) + Math.abs(player.col - stalker.col);
+};
+
+// ── Lunge ─────────────────────────────────────────────────────────────────────
+// Every LUNGE_INTERVAL_MS the stalker gets a burst of extra steps.
+const LUNGE_INTERVAL_MS  = 18000; // lunge every ~18s
+const LUNGE_INTERVAL_JITTER = 8000;
+const LUNGE_STEPS = 3; // extra steps on top of the normal 1
+let lungeTimeout = null;
+
+const scheduleLunge = () => {
+  clearTimeout(lungeTimeout);
+  lungeTimeout = setTimeout(() => {
+    if (state.gameStatus !== 'playing') return;
+    // Do the lunge: move stalker LUNGE_STEPS extra times immediately
+    for (let i = 0; i < LUNGE_STEPS && state.gameStatus === 'playing'; i++) {
+      state = moveStalker(state);
+      state = checkStalkerCollision(state);
+    }
+    if (state.gameStatus === 'lost') { finishGame(); return; }
+    // Signal audio
+    if (typeof onStalkerLunge === 'function') onStalkerLunge();
+    updateHud();
+    scheduleLunge(); // reschedule
+  }, LUNGE_INTERVAL_MS + Math.random() * LUNGE_INTERVAL_JITTER);
+};
+
+const cancelLunge = () => clearTimeout(lungeTimeout);
 
 const runStalkerTurn = (gameState, bonusSteps = 0) => {
   let nextState = gameState;
@@ -612,6 +727,10 @@ const runStalkerTurn = (gameState, bonusSteps = 0) => {
   for (let step = 0; step < totalSteps && nextState.gameStatus === 'playing'; step += 1) {
     nextState = moveStalker(nextState);
     nextState = checkStalkerCollision(nextState);
+  }
+  // Notify audio of new proximity
+  if (typeof setStalkerProximity === 'function') {
+    setStalkerProximity(stalkerDistance(nextState));
   }
   return nextState;
 };
@@ -704,15 +823,38 @@ const renderStalker = (row, col) => {
   ctx.fill();
 };
 
+// Render just the stalker's glowing red eyes — used when it's in darkness nearby
+const renderStalkerEyes = (row, col, alpha) => {
+  const x = col * TILE + TILE / 2;
+  const y = row * TILE + TILE / 2;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.shadowColor = '#ff0000';
+  ctx.shadowBlur = 10;
+  ctx.fillStyle = '#ff3333';
+  ctx.beginPath();
+  ctx.arc(x - 4, y - 2, 2.5, 0, Math.PI * 2);
+  ctx.arc(x + 4, y - 2, 2.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+};
+
 const renderCube = (row, col) => {
   const x = col * TILE + TILE / 2;
   const y = row * TILE + TILE / 2;
   const size = TILE / 4;
-  ctx.fillStyle = '#7ec8ff';
+  // Pulsing glow — oscillates using time
+  const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 400);
+  ctx.save();
+  ctx.shadowColor = '#7ec8ff';
+  ctx.shadowBlur = 6 + pulse * 10;
+  ctx.fillStyle = `rgba(126, 200, 255, ${0.75 + pulse * 0.25})`;
   ctx.fillRect(x - size, y - size, size * 2, size * 2);
+  ctx.shadowBlur = 0;
   ctx.strokeStyle = '#c8e8ff';
   ctx.lineWidth = 2;
   ctx.strokeRect(x - size, y - size, size * 2, size * 2);
+  ctx.restore();
 };
 
 const renderDoor = (row, col, unlocked) => {
@@ -720,8 +862,14 @@ const renderDoor = (row, col, unlocked) => {
   const y = row * TILE + TILE / 2;
   const width = TILE / 2;
   const height = (TILE * 2) / 3;
+  ctx.save();
+  if (unlocked) {
+    ctx.shadowColor = '#6bdc6b';
+    ctx.shadowBlur = 12;
+  }
   ctx.fillStyle = unlocked ? '#6bdc6b' : '#4a3030';
   ctx.fillRect(x - width / 2, y - height / 2, width, height);
+  ctx.shadowBlur = 0;
   ctx.strokeStyle = unlocked ? '#c8ffc8' : '#8a5050';
   ctx.lineWidth = 2;
   ctx.strokeRect(x - width / 2, y - height / 2, width, height);
@@ -734,51 +882,197 @@ const renderDoor = (row, col, unlocked) => {
     ctx.lineTo(x - width / 4, y + height / 4);
     ctx.stroke();
   }
+  ctx.restore();
 };
 
-const renderTile = (row, col, tile, lit, layer) => {
+// Brightness falloff — 1.0 at player, 0.0 at radius edge
+const getLightBrightness = (row, col, playerRow, playerCol, lightRadius) => {
+  const dx = col - playerCol;
+  const dy = row - playerRow;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  if (dist > lightRadius) return 0;
+  return Math.max(0, 1 - (dist / lightRadius) ** 1.6);
+};
+
+const renderTile = (row, col, tile, brightness, explored, layer) => {
   const x = col * TILE;
   const y = row * TILE;
   const colors = TILE_COLORS[layer];
-  ctx.fillStyle = tile === WALL
-    ? (lit ? colors.wallLit : colors.wallDim)
-    : (lit ? colors.floorLit : colors.floorDim);
-  ctx.fillRect(x, y, TILE, TILE);
-  if (lit) {
-    ctx.strokeStyle = layer === 0 ? '#1a0a0a' : '#0a0a1a';
+
+  let fillColor;
+  if (brightness > 0) {
+    // Interpolate between dim and lit color based on brightness
+    const litColor   = tile === WALL ? colors.wallLit  : colors.floorLit;
+    const dimColor   = tile === WALL ? colors.wallDim  : colors.floorDim;
+    // Simple brightness blend: at brightness=1 use litColor, at 0 use dimColor
+    fillColor = brightness > 0.55 ? litColor : dimColor;
+    // Overlay alpha to fake smooth gradient
+    ctx.fillStyle = fillColor;
+    ctx.fillRect(x, y, TILE, TILE);
+    if (brightness < 1) {
+      ctx.fillStyle = `rgba(0,0,0,${(1 - brightness) * 0.72})`;
+      ctx.fillRect(x, y, TILE, TILE);
+    }
+    ctx.strokeStyle = layer === 0 ? 'rgba(26,10,10,0.4)' : 'rgba(10,10,26,0.4)';
     ctx.strokeRect(x, y, TILE, TILE);
+  } else if (explored) {
+    fillColor = tile === WALL ? colors.wallDim : colors.floorDim;
+    ctx.fillStyle = fillColor;
+    ctx.fillRect(x, y, TILE, TILE);
   }
+};
+
+// ── Particle trail ────────────────────────────────────────────────────────────
+const MAX_TRAIL = 18;
+const playerTrail = []; // array of {row, col, age} — age 0=newest
+
+const addTrailPoint = (row, col) => {
+  // Only add if moved
+  if (playerTrail.length > 0 && playerTrail[0].row === row && playerTrail[0].col === col) return;
+  playerTrail.unshift({ row, col, age: 0 });
+  if (playerTrail.length > MAX_TRAIL) playerTrail.pop();
+};
+
+const renderTrail = (playerRow, playerCol, currentLayer, lightRadius) => {
+  playerTrail.forEach((pt, i) => {
+    pt.age += 1;
+    const dist = Math.sqrt((pt.col - playerCol) ** 2 + (pt.row - playerRow) ** 2);
+    if (dist > lightRadius + 1) return; // only in or near light
+    const alpha = Math.max(0, (1 - i / MAX_TRAIL) * 0.35);
+    const x = pt.col * TILE + TILE / 2;
+    const y = pt.row * TILE + TILE / 2;
+    const r = TILE / 9;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = currentLayer === 0 ? '#ff6644' : '#4488ff';
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  });
+};
+
+// ── Stalker trail ─────────────────────────────────────────────────────────────
+const MAX_STALKER_TRAIL = 5;
+const stalkerTrail = []; // {row, col}
+
+const addStalkerTrailPoint = (row, col) => {
+  if (stalkerTrail.length > 0 && stalkerTrail[0].row === row && stalkerTrail[0].col === col) return;
+  stalkerTrail.unshift({ row, col });
+  if (stalkerTrail.length > MAX_STALKER_TRAIL) stalkerTrail.pop();
+};
+
+const renderStalkerTrail = (playerRow, playerCol, lightRadius) => {
+  stalkerTrail.forEach((pt, i) => {
+    const dist = Math.sqrt((pt.col - playerCol) ** 2 + (pt.row - playerRow) ** 2);
+    if (dist > lightRadius + 1) return;
+    const alpha = Math.max(0, (1 - i / MAX_STALKER_TRAIL) * 0.28);
+    const x = pt.col * TILE + TILE / 2;
+    const y = pt.row * TILE + TILE / 2;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = '#cc1111';
+    ctx.beginPath();
+    ctx.arc(x, y, TILE / 8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  });
+};
+
+// ── Flashlight flicker ────────────────────────────────────────────────────────
+let flickerActive = false;
+let flickerAmount = 0;
+
+const scheduleFlicker = () => {
+  const delay = 8000 + Math.random() * 12000;
+  setTimeout(() => {
+    if (state.gameStatus !== 'playing') { scheduleFlicker(); return; }
+    flickerActive = true;
+    flickerAmount = 0.4 + Math.random() * 0.5; // shrink by this fraction
+    setTimeout(() => {
+      flickerActive = false;
+      scheduleFlicker();
+    }, 80 + Math.random() * 120);
+  }, delay);
+};
+scheduleFlicker();
+
+// ── Line of sight ─────────────────────────────────────────────────────────────
+const hasLineOfSight = (r1, c1, r2, c2, layerIdx) => {
+  const steps = Math.max(Math.abs(r2 - r1), Math.abs(c2 - c1));
+  if (steps === 0) return true;
+  for (let i = 1; i < steps; i++) {
+    const r = Math.round(r1 + (r2 - r1) * (i / steps));
+    const c = Math.round(c1 + (c2 - c1) * (i / steps));
+    if (state.map[layerIdx][r][c] === WALL) return false;
+  }
+  return true;
 };
 
 const render = () => {
   const { currentLayer, difficulty } = state;
-  const { lightRadius } = getDifficultyConfig(difficulty);
+  let { lightRadius } = getDifficultyConfig(difficulty);
+  // Apply flicker
+  if (flickerActive) lightRadius *= (1 - flickerAmount);
+
   const layer = state.map[currentLayer];
   const seenLayer = state.seen[currentLayer];
   const { row: playerRow, col: playerCol } = state.player;
   const { row: stalkerRow, col: stalkerCol } = state.stalker;
 
+  // Track trails
+  addTrailPoint(playerRow, playerCol);
+  if (!state.stalkerDimensionLocked) addStalkerTrailPoint(stalkerRow, stalkerCol);
+
   ctx.fillStyle = '#000000';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+  // Tiles with gradient brightness
   for (let row = 0; row < ROWS; row += 1) {
     for (let col = 0; col < COLS; col += 1) {
-      const lit = isInLight(row, col, playerRow, playerCol, lightRadius);
+      const brightness = getLightBrightness(row, col, playerRow, playerCol, lightRadius);
       const explored = seenLayer[row][col];
-      if (!lit && !explored) continue;
+      if (brightness === 0 && !explored) continue;
+      renderTile(row, col, layer[row][col], brightness, explored, currentLayer);
 
-      renderTile(row, col, layer[row][col], lit, currentLayer);
-
-      if (lit && layer[row][col] === CUBE) renderCube(row, col);
-      if (lit && layer[row][col] === DOOR) renderDoor(row, col, allCubesCollected(state));
+      if (brightness > 0) {
+        if (layer[row][col] === CUBE) renderCube(row, col);
+        if (layer[row][col] === DOOR) renderDoor(row, col, allCubesCollected(state));
+      }
     }
   }
 
-  if (isInLight(stalkerRow, stalkerCol, playerRow, playerCol, lightRadius)) {
-    renderStalker(stalkerRow, stalkerCol);
+  // Player trail (under player)
+  renderTrail(playerRow, playerCol, currentLayer, lightRadius);
+
+  // Stalker trail (red smear — only if same dimension)
+  if (!state.stalkerDimensionLocked) {
+    renderStalkerTrail(playerRow, playerCol, lightRadius);
   }
 
+  // Stalker visibility
+  const { stalkerDimensionLocked } = state;
+  const stalkerDist = Math.sqrt((stalkerCol - playerCol) ** 2 + (stalkerRow - playerRow) ** 2);
+  const stalkerInLight = stalkerDist <= lightRadius;
+  const stalkerHasLos = hasLineOfSight(playerRow, playerCol, stalkerRow, stalkerCol, currentLayer);
+
+  if (!stalkerDimensionLocked) {
+    if (stalkerInLight && stalkerHasLos) {
+      // Fully visible — render whole body
+      renderStalker(stalkerRow, stalkerCol);
+    } else if (stalkerDist <= 5 && stalkerHasLos) {
+      // In darkness but close and has LoS — show glowing eyes only
+      const eyeAlpha = Math.max(0.15, 1 - stalkerDist / 5);
+      renderStalkerEyes(stalkerRow, stalkerCol, eyeAlpha);
+    }
+  }
+
+  // Player
+  ctx.save();
+  ctx.shadowColor = '#f5d76e';
+  ctx.shadowBlur = 8;
   drawEntity(playerRow, playerCol, '#f5d76e');
+  ctx.restore();
 };
 
 const gameLoop = () => {

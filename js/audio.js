@@ -558,6 +558,7 @@ const buildBlueLayer = () => {
 // ─── SOUNDTRACK CONTROL ──────────────────────────────────────────────────────
 
 const stopSoundtrack = (fadeMs = 1000) => {
+  stopProximityBeat();
   if (!soundtrackNodes || !audioContext) return;
   const { master, sources } = soundtrackNodes;
   const now = audioContext.currentTime;
@@ -646,6 +647,145 @@ const setMute = (muted) => {
 };
 
 const toggleMute = () => setMute(!isMuted);
+
+// ─── PROXIMITY & LUNGE AUDIO ──────────────────────────────────────────────────
+
+// Separate gain node for the proximity heartbeat so it can scale independently
+let proximityBeatNode = null;
+let proximityBeatStopped = false;
+let proximityBeatInterval = null;
+let currentProximityBpm = 60; // slow baseline
+
+const PROXIMITY_THRESHOLDS = [
+  { dist: 2,  bpm: 160, gain: 0.55 }, // RIGHT there
+  { dist: 4,  bpm: 120, gain: 0.38 },
+  { dist: 6,  bpm: 90,  gain: 0.22 },
+  { dist: 10, bpm: 68,  gain: 0.10 },
+  { dist: 999,bpm: 0,   gain: 0    }, // far away — silent
+];
+
+const stopProximityBeat = () => {
+  proximityBeatStopped = true;
+  clearTimeout(proximityBeatInterval);
+  proximityBeatNode = null;
+};
+
+const startProximityBeat = (bpm, gainVal) => {
+  proximityBeatStopped = false;
+  currentProximityBpm = bpm;
+
+  const beat = () => {
+    if (proximityBeatStopped || !audioContext) return;
+    const now = audioContext.currentTime;
+    const dest = muteGainNode || audioContext.destination;
+
+    // Double-thump heartbeat
+    const fire = (freq, delay, vol) => {
+      setTimeout(() => {
+        if (proximityBeatStopped || !audioContext) return;
+        const t = audioContext.currentTime;
+        const o = audioContext.createOscillator();
+        const g = audioContext.createGain();
+        o.type = 'sine';
+        o.frequency.setValueAtTime(freq, t);
+        o.frequency.exponentialRampToValueAtTime(freq * 0.25, t + 0.15);
+        g.gain.setValueAtTime(vol, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+        o.connect(g);
+        g.connect(dest);
+        o.start(t);
+        o.stop(t + 0.2);
+      }, delay);
+    };
+
+    fire(65, 0, gainVal);
+    fire(55, 160, gainVal * 0.7); // second weaker thump
+
+    const intervalMs = (60 / currentProximityBpm) * 1000;
+    proximityBeatInterval = setTimeout(beat, intervalMs);
+  };
+
+  beat();
+};
+
+// Called by app.js every stalker turn with Manhattan distance
+const setStalkerProximity = (distance) => {
+  if (!audioContext) return;
+
+  const tier = PROXIMITY_THRESHOLDS.find(t => distance <= t.dist);
+  if (!tier || tier.bpm === 0) {
+    stopProximityBeat();
+    return;
+  }
+
+  // If BPM changed significantly, restart the beat loop at new speed
+  if (Math.abs(tier.bpm - currentProximityBpm) > 5 || proximityBeatStopped) {
+    stopProximityBeat();
+    startProximityBeat(tier.bpm, tier.gain);
+  }
+};
+
+// Called by app.js when a lunge fires — jarring low boom + high screech
+const onStalkerLunge = () => {
+  initAudio().then(() => {
+    if (!audioContext) return;
+    const now = audioContext.currentTime;
+    const dest = muteGainNode || audioContext.destination;
+
+    // Sub boom
+    const boom = audioContext.createOscillator();
+    const boomG = audioContext.createGain();
+    boom.type = 'sine';
+    boom.frequency.setValueAtTime(80, now);
+    boom.frequency.exponentialRampToValueAtTime(25, now + 0.4);
+    boomG.gain.setValueAtTime(0.5, now);
+    boomG.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+    boom.connect(boomG);
+    boomG.connect(dest);
+    boom.start(now);
+    boom.stop(now + 0.55);
+
+    // Short screech layer
+    const screech = audioContext.createOscillator();
+    const screechG = audioContext.createGain();
+    screech.type = 'sawtooth';
+    screech.frequency.setValueAtTime(400, now + 0.05);
+    screech.frequency.exponentialRampToValueAtTime(120, now + 0.3);
+    screechG.gain.setValueAtTime(0.18, now + 0.05);
+    screechG.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+    screech.connect(screechG);
+    screechG.connect(dest);
+    screech.start(now + 0.05);
+    screech.stop(now + 0.4);
+  });
+};
+
+// Called by app.js when dimension memory triggers — eerie tone shift
+const onStalkerMemory = () => {
+  initAudio().then(() => {
+    if (!audioContext) return;
+    const now = audioContext.currentTime;
+    const dest = muteGainNode || audioContext.destination;
+
+    // Rising ethereal tone — "it stayed behind"
+    const o = audioContext.createOscillator();
+    const g = audioContext.createGain();
+    const f = audioContext.createBiquadFilter();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(220, now);
+    o.frequency.linearRampToValueAtTime(440, now + 0.8);
+    f.type = 'highpass';
+    f.frequency.value = 300;
+    g.gain.setValueAtTime(0, now);
+    g.gain.linearRampToValueAtTime(0.12, now + 0.15);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
+    o.connect(f);
+    f.connect(g);
+    g.connect(dest);
+    o.start(now);
+    o.stop(now + 1.3);
+  });
+};
 
 // ─── ONE-SHOT SFX ────────────────────────────────────────────────────────────
 
