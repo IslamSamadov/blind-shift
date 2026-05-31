@@ -12,7 +12,14 @@
     <p id="high-score" class="high-score">High Score: 0 cubes</p>
     <div class="game-container">
       <p id="hud" class="hud hidden">Cubes: 0 / 0</p>
+
       <canvas id="game" width="480" height="352"></canvas>
+
+      <!-- Dimension shift flash overlay -->
+      <div id="shift-flash" aria-hidden="true"></div>
+
+      <!-- Mute button -->
+      <button id="mute-btn" type="button" title="Toggle sound">🔊</button>
 
       <div id="jumpscare" class="jumpscare hidden" aria-hidden="true">
         <div class="jumpscare-face">
@@ -39,6 +46,18 @@
       </div>
     </div>
     <p class="hint">Choose Easy or Hard — Hard: stalker reacts to shifts and cubes</p>
+
+    <!-- Mobile controls -->
+    <div id="mobile-controls" aria-label="Mobile controls">
+      <div class="dpad">
+        <button class="dpad-btn dpad-up"   data-key="ArrowUp"    aria-label="Up">▲</button>
+        <button class="dpad-btn dpad-left"  data-key="ArrowLeft"  aria-label="Left">◀</button>
+        <button class="dpad-btn dpad-center" aria-hidden="true"></button>
+        <button class="dpad-btn dpad-right" data-key="ArrowRight" aria-label="Right">▶</button>
+        <button class="dpad-btn dpad-down"  data-key="ArrowDown"  aria-label="Down">▼</button>
+      </div>
+      <button class="shift-btn" id="mobile-shift-btn" aria-label="Phase shift">SHIFT</button>
+    </div>
   </main>
   <script src="js/audio.js"></script>
   <script src="js/app.js"></script>

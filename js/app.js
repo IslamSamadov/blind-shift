@@ -411,9 +411,19 @@ const createPreviewState = () => ({
 let state = createPreviewState();
 let isShiftOnCooldown = false;
 
+const triggerShiftFlash = (layer) => {
+  const el = document.getElementById('shift-flash');
+  if (!el) return;
+  el.classList.remove('shift-to-red', 'shift-to-blue');
+  void el.offsetWidth;
+  el.classList.add(layer === 0 ? 'shift-to-red' : 'shift-to-blue');
+  setTimeout(() => el.classList.remove('shift-to-red', 'shift-to-blue'), 500);
+};
+
 const applyDimensionTheme = (layer) => {
   document.body.classList.toggle('red-dimension', layer === 0);
   document.body.classList.toggle('blue-dimension', layer === 1);
+  triggerShiftFlash(layer);
   if (typeof shiftSoundtrackTheme === 'function') {
     shiftSoundtrackTheme(layer);
   }
@@ -815,6 +825,27 @@ window.addEventListener('keydown', (event) => {
 easyBtn.addEventListener('click', () => startGame('easy'));
 hardBtn.addEventListener('click', () => startGame('hard'));
 restartBtn.addEventListener('click', restartGame);
+
+document.getElementById('mute-btn').addEventListener('click', () => {
+  if (typeof toggleMute === 'function') toggleMute();
+});
+
+// ── Mobile D-pad ─────────────────────────────────────────────────────────────
+// Use touchstart (not click) for instant response with no 300ms delay
+document.querySelectorAll('.dpad-btn[data-key]').forEach((btn) => {
+  const fire = (e) => {
+    e.preventDefault();
+    handleInput(btn.dataset.key);
+  };
+  btn.addEventListener('touchstart', fire, { passive: false });
+  btn.addEventListener('click', fire); // fallback for mouse on desktop preview
+});
+
+document.getElementById('mobile-shift-btn').addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  handleShift();
+}, { passive: false });
+document.getElementById('mobile-shift-btn').addEventListener('click', () => handleShift());
 
 updateHighScoreDisplay();
 updateHint();
