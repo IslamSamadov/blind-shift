@@ -5,6 +5,7 @@ const ROWS = 11;
 const WALL = 1;
 const FLOOR = 0;
 const CUBE = 2;
+const LIGHT_RADIUS = 2.5;
 
 const LAYER_0 = [
   [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
@@ -32,6 +33,36 @@ const restartBtn = document.getElementById('restart-btn');
 
 const cloneMap = (map) => map.map((layer) => layer.map((row) => [...row]));
 
+const createEmptySeen = (layerCount) => (
+  Array.from({ length: layerCount }, () => (
+    Array.from({ length: ROWS }, () => Array(COLS).fill(false))
+  ))
+);
+
+const cloneSeen = (seen) => seen.map((layer) => layer.map((row) => [...row]));
+
+const isInLight = (row, col, playerRow, playerCol) => {
+  const dx = col - playerCol;
+  const dy = row - playerRow;
+
+  return Math.sqrt((dx * dx) + (dy * dy)) <= LIGHT_RADIUS;
+};
+
+const updateSeen = (gameState) => {
+  const { player, currentLayer, seen } = gameState;
+  const newSeen = cloneSeen(seen);
+
+  for (let row = 0; row < ROWS; row += 1) {
+    for (let col = 0; col < COLS; col += 1) {
+      if (isInLight(row, col, player.row, player.col)) {
+        newSeen[currentLayer][row][col] = true;
+      }
+    }
+  }
+
+  return { ...gameState, seen: newSeen };
+};
+
 const countCubes = (map) => {
   let total = 0;
 
@@ -50,8 +81,9 @@ const countCubes = (map) => {
 
 const createPlayingState = () => {
   const map = cloneMap([LAYER_0]);
+  const seen = createEmptySeen(map.length);
 
-  return {
+  return updateSeen({
     currentLayer: 0,
     player: { row: 1, col: 1 },
     stalker: { row: 9, col: 13 },
@@ -59,7 +91,8 @@ const createPlayingState = () => {
     totalCubes: countCubes(map),
     gameStatus: 'playing',
     map,
-  };
+    seen,
+  });
 };
 
 const createPreviewState = () => ({
@@ -206,6 +239,7 @@ const handleInput = (key) => {
   }
 
   state = movePlayer(state, delta[0], delta[1]);
+  state = updateSeen(state);
   state = collectCube(state);
 
   if (state.gameStatus === 'playing') {
@@ -255,37 +289,54 @@ const renderCube = (row, col) => {
   ctx.strokeRect(x - size, y - size, size * 2, size * 2);
 };
 
+const renderTile = (row, col, tile, lit) => {
+  const x = col * TILE;
+  const y = row * TILE;
+
+  if (tile === WALL) {
+    ctx.fillStyle = lit ? '#5c2020' : '#241010';
+  } else {
+    ctx.fillStyle = lit ? '#2a1212' : '#140909';
+  }
+
+  ctx.fillRect(x, y, TILE, TILE);
+
+  if (lit) {
+    ctx.strokeStyle = '#1a0a0a';
+    ctx.strokeRect(x, y, TILE, TILE);
+  }
+};
+
 const render = () => {
   const layer = state.map[state.currentLayer];
+  const seenLayer = state.seen[state.currentLayer];
   const { row: playerRow, col: playerCol } = state.player;
   const { row: stalkerRow, col: stalkerCol } = state.stalker;
 
-  ctx.fillStyle = '#0d0505';
+  ctx.fillStyle = '#000000';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   for (let row = 0; row < ROWS; row += 1) {
     for (let col = 0; col < COLS; col += 1) {
-      const x = col * TILE;
-      const y = row * TILE;
-      const tile = layer[row][col];
+      const lit = isInLight(row, col, playerRow, playerCol);
+      const explored = seenLayer[row][col];
 
-      if (tile === WALL) {
-        ctx.fillStyle = '#5c2020';
-      } else {
-        ctx.fillStyle = '#2a1212';
+      if (!lit && !explored) {
+        continue;
       }
 
-      ctx.fillRect(x, y, TILE, TILE);
-      ctx.strokeStyle = '#1a0a0a';
-      ctx.strokeRect(x, y, TILE, TILE);
+      renderTile(row, col, layer[row][col], lit);
 
-      if (tile === CUBE) {
+      if (lit && layer[row][col] === CUBE) {
         renderCube(row, col);
       }
     }
   }
 
-  renderStalker(stalkerRow, stalkerCol);
+  if (isInLight(stalkerRow, stalkerCol, playerRow, playerCol)) {
+    renderStalker(stalkerRow, stalkerCol);
+  }
+
   drawEntity(playerRow, playerCol, '#f5d76e');
 };
 
