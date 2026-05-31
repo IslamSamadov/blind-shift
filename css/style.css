@@ -1,0 +1,44 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+  
+  body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: system-ui, sans-serif;
+    color: #f0e6e6;
+    background-color: #1a0a0a;
+  }
+  
+  body.red-dimension {
+    background-color: #1a0a0a;
+  }
+  
+  main {
+    text-align: center;
+  }
+  
+  h1 {
+    margin-bottom: 1rem;
+    font-size: 1.5rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  
+  #game {
+    display: block;
+    margin: 0 auto;
+    border: 2px solid #5c2020;
+    image-rendering: pixelated;
+  }
+  
+  .hint {
+    margin-top: 0.75rem;
+    font-size: 0.875rem;
+    opacity: 0.7;
+  }
+  
