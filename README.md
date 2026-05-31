@@ -98,7 +98,4 @@ The game's state is simple and predictable: a 3D array `[layer][row][col]` holds
 
 ## 🐛 Known Bugs / What I'd Fix Next
 
-- **Stalker pathfinding** — The current AI tries both axes when blocked but can still get stuck in complex dead ends. A full BFS/A* pathfinding implementation would make it truly inescapable and fair.
-- **Mobile controls** — No touch support currently. On-screen D-pad buttons would make the game playable on mobile browsers.
 - **Level progression** — There is only one difficulty tier per setting. A proper level system with increasing maze complexity and more cubes per level would extend the experience significantly.
-- **Dimension shift animation** — The switch between dimensions is instant. A brief screen-tear or distortion shader effect would sell the dimensional hop much better visually.
