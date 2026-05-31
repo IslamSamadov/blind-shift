@@ -15,6 +15,7 @@ const EXIT_DOOR = { row: 1, col: 13 };
 const MIN_CUBES_PER_LAYER = 2;
 const MAX_CUBES_PER_LAYER = 3;
 const STALKER_BONUS_STEPS_ON_CUBE = 1;
+const HIGH_SCORE_KEY = 'blindShiftHighScore';
 const JUMPSCARE_MS = 750;
 
 const LAYER_NAMES = ['Red', 'Blue'];
@@ -34,9 +35,30 @@ const gameOverTitle = document.getElementById('game-over-title');
 const gameOverMessage = document.getElementById('game-over-message');
 const startBtn = document.getElementById('start-btn');
 const restartBtn = document.getElementById('restart-btn');
+const highScoreEl = document.getElementById('high-score');
 const jumpscare = document.getElementById('jumpscare');
 
 let pendingGameOver = false;
+
+const getHighScore = () => {
+  const stored = localStorage.getItem(HIGH_SCORE_KEY);
+  return stored ? Number(stored) : 0;
+};
+
+const saveHighScore = (score) => {
+  const currentBest = getHighScore();
+
+  if (score > currentBest) {
+    localStorage.setItem(HIGH_SCORE_KEY, String(score));
+    return true;
+  }
+
+  return false;
+};
+
+const updateHighScoreDisplay = () => {
+  highScoreEl.textContent = `High Score: ${getHighScore()} cubes`;
+};
 
 const showJumpscare = (callback) => {
   jumpscare.classList.remove('hidden');
@@ -499,17 +521,23 @@ const startGame = () => {
 
 const showGameOver = () => {
   gameOverScreen.classList.remove('win', 'lost');
+  const isNewRecord = saveHighScore(state.score);
 
   if (state.gameStatus === 'won') {
     gameOverTitle.textContent = 'You Win';
-    gameOverMessage.textContent = 'All cubes collected — you escaped through the exit!';
+    gameOverMessage.textContent = isNewRecord
+      ? `You escaped! New high score: ${state.score} cubes.`
+      : 'All cubes collected — you escaped through the exit!';
     gameOverScreen.classList.add('win');
   } else {
     gameOverTitle.textContent = 'You Lose';
-    gameOverMessage.textContent = `Collected ${state.score} / ${state.totalCubes} cubes.`;
+    gameOverMessage.textContent = isNewRecord
+      ? `Caught! New high score: ${state.score} / ${state.totalCubes} cubes.`
+      : `Collected ${state.score} / ${state.totalCubes} cubes.`;
     gameOverScreen.classList.add('lost');
   }
 
+  updateHighScoreDisplay();
   gameOverScreen.classList.remove('hidden');
   pendingGameOver = false;
 };
@@ -620,7 +648,7 @@ const updateHud = () => {
   const layerName = LAYER_NAMES[state.currentLayer];
   const exitStatus = allCubesCollected(state) ? 'Exit unlocked' : 'Exit locked';
 
-  hud.textContent = `Cubes: ${state.score} / ${state.totalCubes} | ${layerName} | ${exitStatus}`;
+  hud.textContent = `Cubes: ${state.score} / ${state.totalCubes} | ${layerName} | ${exitStatus} | Best: ${getHighScore()}`;
 };
 
 const handleInput = (key) => {
@@ -832,4 +860,5 @@ window.addEventListener('keydown', (event) => {
 startBtn.addEventListener('click', startGame);
 restartBtn.addEventListener('click', restartGame);
 
+updateHighScoreDisplay();
 gameLoop();
