@@ -34,12 +34,75 @@
     font-size: 1rem;
     letter-spacing: 0.04em;
   }
+
+  .hud.hidden,
+  .screen.hidden {
+    display: none;
+  }
+
+  .game-container {
+    position: relative;
+    display: inline-block;
+  }
   
   #game {
     display: block;
-    margin: 0 auto;
     border: 2px solid #5c2020;
     image-rendering: pixelated;
+  }
+
+  .screen {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 1.5rem;
+    background: rgba(13, 5, 5, 0.94);
+    border: 2px solid #5c2020;
+    text-align: center;
+  }
+
+  .screen h2 {
+    font-size: 1.75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .screen-text {
+    line-height: 1.5;
+    opacity: 0.85;
+  }
+
+  .screen-hint {
+    font-size: 0.875rem;
+    opacity: 0.55;
+  }
+
+  #start-btn {
+    margin-top: 0.25rem;
+    padding: 0.65rem 1.5rem;
+    border: 1px solid #5c2020;
+    background: #2a1212;
+    color: #f0e6e6;
+    font: inherit;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+
+  #start-btn:hover {
+    background: #3a1818;
+  }
+
+  #game-over-screen.win h2 {
+    color: #7ec8ff;
+  }
+
+  #game-over-screen.lost h2 {
+    color: #ff6666;
   }
   
   .hint {

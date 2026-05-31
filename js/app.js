@@ -23,6 +23,11 @@ const LAYER_0 = [
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const hud = document.getElementById('hud');
+const startScreen = document.getElementById('start-screen');
+const gameOverScreen = document.getElementById('game-over-screen');
+const gameOverTitle = document.getElementById('game-over-title');
+const gameOverMessage = document.getElementById('game-over-message');
+const startBtn = document.getElementById('start-btn');
 
 const cloneMap = (map) => map.map((layer) => layer.map((row) => [...row]));
 
@@ -42,7 +47,7 @@ const countCubes = (map) => {
   return total;
 };
 
-const createInitialState = () => {
+const createPlayingState = () => {
   const map = cloneMap([LAYER_0]);
 
   return {
@@ -56,7 +61,37 @@ const createInitialState = () => {
   };
 };
 
-let state = createInitialState();
+const createPreviewState = () => ({
+  ...createPlayingState(),
+  gameStatus: 'start',
+});
+
+let state = createPreviewState();
+
+const startGame = () => {
+  state = createPlayingState();
+  startScreen.classList.add('hidden');
+  gameOverScreen.classList.add('hidden');
+  gameOverScreen.classList.remove('win', 'lost');
+  hud.classList.remove('hidden');
+  updateHud();
+};
+
+const showGameOver = () => {
+  gameOverScreen.classList.remove('win', 'lost');
+
+  if (state.gameStatus === 'won') {
+    gameOverTitle.textContent = 'You Win';
+    gameOverMessage.textContent = `All ${state.totalCubes} cubes collected!`;
+    gameOverScreen.classList.add('win');
+  } else {
+    gameOverTitle.textContent = 'You Lose';
+    gameOverMessage.textContent = `Collected ${state.score} / ${state.totalCubes} cubes.`;
+    gameOverScreen.classList.add('lost');
+  }
+
+  gameOverScreen.classList.remove('hidden');
+};
 
 const isPassable = (layer, row, col) => {
   if (row < 0 || row >= ROWS || col < 0 || col >= COLS) {
@@ -173,6 +208,10 @@ const handleInput = (key) => {
     state = checkStalkerCollision(state);
   }
 
+  if (state.gameStatus === 'won' || state.gameStatus === 'lost') {
+    showGameOver();
+  }
+
   updateHud();
 };
 
@@ -211,23 +250,12 @@ const renderCube = (row, col) => {
   ctx.strokeRect(x - size, y - size, size * 2, size * 2);
 };
 
-const renderOverlay = (title, subtitle, color) => {
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = color;
-  ctx.font = 'bold 28px system-ui, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText(title, canvas.width / 2, canvas.height / 2 - 10);
-  ctx.font = '16px system-ui, sans-serif';
-  ctx.fillText(subtitle, canvas.width / 2, canvas.height / 2 + 22);
-};
-
 const render = () => {
   const layer = state.map[state.currentLayer];
   const { row: playerRow, col: playerCol } = state.player;
   const { row: stalkerRow, col: stalkerCol } = state.stalker;
 
-  ctx.fillStyle = state.gameStatus === 'lost' ? '#3a0808' : '#0d0505';
+  ctx.fillStyle = '#0d0505';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   for (let row = 0; row < ROWS; row += 1) {
@@ -254,14 +282,6 @@ const render = () => {
 
   renderStalker(stalkerRow, stalkerCol);
   drawEntity(playerRow, playerCol, '#f5d76e');
-
-  if (state.gameStatus === 'lost') {
-    renderOverlay('You Lose', `Collected ${state.score} / ${state.totalCubes} cubes`, '#ff6666');
-  }
-
-  if (state.gameStatus === 'won') {
-    renderOverlay('You Win', `All ${state.totalCubes} cubes collected`, '#7ec8ff');
-  }
 };
 
 const gameLoop = () => {
@@ -270,6 +290,12 @@ const gameLoop = () => {
 };
 
 window.addEventListener('keydown', (event) => {
+  if (state.gameStatus === 'start' && (event.key === 'Enter' || event.key === ' ')) {
+    event.preventDefault();
+    startGame();
+    return;
+  }
+
   const movementKeys = [
     'ArrowUp',
     'ArrowDown',
@@ -291,5 +317,6 @@ window.addEventListener('keydown', (event) => {
   }
 });
 
+startBtn.addEventListener('click', startGame);
+
 gameLoop();
-updateHud();
