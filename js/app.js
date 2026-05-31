@@ -15,6 +15,7 @@ const EXIT_DOOR = { row: 1, col: 13 };
 const MIN_CUBES_PER_LAYER = 2;
 const MAX_CUBES_PER_LAYER = 3;
 const STALKER_BONUS_STEPS_ON_CUBE = 1;
+const JUMPSCARE_MS = 750;
 
 const LAYER_NAMES = ['Red', 'Blue'];
 const SHIFT_COOLDOWN_MS = 300;
@@ -33,6 +34,37 @@ const gameOverTitle = document.getElementById('game-over-title');
 const gameOverMessage = document.getElementById('game-over-message');
 const startBtn = document.getElementById('start-btn');
 const restartBtn = document.getElementById('restart-btn');
+const jumpscare = document.getElementById('jumpscare');
+
+let pendingGameOver = false;
+
+const showJumpscare = (callback) => {
+  jumpscare.classList.remove('hidden');
+  jumpscare.setAttribute('aria-hidden', 'false');
+
+  setTimeout(() => {
+    jumpscare.classList.add('hidden');
+    jumpscare.setAttribute('aria-hidden', 'true');
+    callback();
+  }, JUMPSCARE_MS);
+};
+
+const finishGame = () => {
+  if (pendingGameOver) {
+    return;
+  }
+
+  pendingGameOver = true;
+
+  if (state.gameStatus === 'lost') {
+    playScreamSound();
+    showJumpscare(showGameOver);
+    return;
+  }
+
+  playWinSound();
+  showGameOver();
+};
 
 const isInBounds = (row, col) => (
   row >= 0 && row < ROWS && col >= 0 && col < COLS
@@ -433,6 +465,7 @@ const handleShift = () => {
   }
 
   state = nextState;
+  playShiftSound();
   state = runStalkerTurn(state, 0);
   isShiftOnCooldown = true;
   setTimeout(() => {
@@ -440,7 +473,7 @@ const handleShift = () => {
   }, SHIFT_COOLDOWN_MS);
 
   if (state.gameStatus === 'won' || state.gameStatus === 'lost') {
-    showGameOver();
+    finishGame();
   }
 
   updateHud();
@@ -451,6 +484,9 @@ const restartGame = () => {
 };
 
 const startGame = () => {
+  initAudio();
+  pendingGameOver = false;
+  jumpscare.classList.add('hidden');
   state = createPlayingState();
   isShiftOnCooldown = false;
   applyDimensionTheme(0);
@@ -475,6 +511,7 @@ const showGameOver = () => {
   }
 
   gameOverScreen.classList.remove('hidden');
+  pendingGameOver = false;
 };
 
 const isPassable = (layer, row, col) => (
@@ -614,6 +651,10 @@ const handleInput = (key) => {
   state = collectCube(state);
   const collectedCube = state.score > scoreBeforeCube;
 
+  if (collectedCube) {
+    playCubeSound();
+  }
+
   state = checkExit(state);
 
   if (state.gameStatus === 'playing') {
@@ -621,7 +662,7 @@ const handleInput = (key) => {
   }
 
   if (state.gameStatus === 'won' || state.gameStatus === 'lost') {
-    showGameOver();
+    finishGame();
   }
 
   updateHud();

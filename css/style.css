@@ -127,6 +127,63 @@
   #game-over-screen.lost h2 {
     color: #ff6666;
   }
+
+  .jumpscare {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #1a0000;
+    animation: scare-flash 0.75s ease-out forwards;
+  }
+
+  .jumpscare.hidden {
+    display: none;
+    animation: none;
+  }
+
+  .jumpscare-face {
+    width: 190px;
+    height: 190px;
+    background: radial-gradient(circle, #120018 0%, #000 70%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2.5rem;
+    box-shadow: 0 0 40px rgba(255, 0, 0, 0.6);
+    animation: scare-zoom 0.2s ease-out forwards;
+  }
+
+  .jumpscare-eye {
+    width: 42px;
+    height: 42px;
+    background: #ff1a1a;
+    border-radius: 50%;
+    box-shadow: 0 0 24px #ff0000, inset 0 0 8px #fff;
+  }
+
+  @keyframes scare-flash {
+    0% { background: #000; }
+    12% { background: #ff0000; }
+    25% { background: #1a0000; }
+    40% { background: #ff2222; }
+    100% { background: #0a0000; }
+  }
+
+  @keyframes scare-zoom {
+    from {
+      transform: scale(0.2);
+      opacity: 0.4;
+    }
+
+    to {
+      transform: scale(1.15);
+      opacity: 1;
+    }
+  }
   
   .hint {
     margin-top: 0.75rem;
