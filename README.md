@@ -90,7 +90,7 @@ The game's state is simple and predictable: a 3D array `[layer][row][col]` holds
 
 ## 🌐 Live Demo
 
-[Play Blind Shift on GitHub Pages](#) ← *(replace with your GitHub Pages link)*
+[Play Blind Shift on GitHub Pages](https://islamsamadov.github.io/blind-shift/)
 
 ---
 
