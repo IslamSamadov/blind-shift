@@ -14,34 +14,7 @@ const EXIT_DOOR = { row: 1, col: 13 };
 
 const MIN_CUBES_PER_LAYER = 2;
 const MAX_CUBES_PER_LAYER = 3;
-
-const LAYER_0 = [
-  [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-  [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 3],
-  [1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1],
-  [1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1],
-  [1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1],
-  [1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1],
-  [1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1],
-  [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1],
-  [1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1],
-  [1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-  [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-];
-
-const LAYER_1 = [
-  [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-  [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
-  [1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1],
-  [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-  [1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1],
-  [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-  [1, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1],
-  [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-  [1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1],
-  [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-  [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-];
+const STALKER_BONUS_STEPS_ON_CUBE = 1;
 
 const LAYER_NAMES = ['Red', 'Blue'];
 const SHIFT_COOLDOWN_MS = 300;
@@ -244,8 +217,143 @@ const placeRandomCubes = (map) => {
   return newMap;
 };
 
+const createWalledGrid = () => (
+  Array.from({ length: ROWS }, () => Array(COLS).fill(WALL))
+);
+
+const isTraversibleTile = (tile) => tile === FLOOR || tile === DOOR;
+
+const hasPath = (layer, start, end) => {
+  const visited = new Set([`${start.row},${start.col}`]);
+  let frontier = [[start.row, start.col]];
+
+  while (frontier.length > 0) {
+    const nextFrontier = [];
+
+    for (let i = 0; i < frontier.length; i += 1) {
+      const [row, col] = frontier[i];
+
+      if (row === end.row && col === end.col) {
+        return true;
+      }
+
+      [
+        [row - 1, col],
+        [row + 1, col],
+        [row, col - 1],
+        [row, col + 1],
+      ].forEach(([nextRow, nextCol]) => {
+        const key = `${nextRow},${nextCol}`;
+
+        if (visited.has(key) || !isInBounds(nextRow, nextCol)) {
+          return;
+        }
+
+        if (!isTraversibleTile(layer[nextRow][nextCol])) {
+          return;
+        }
+
+        visited.add(key);
+        nextFrontier.push([nextRow, nextCol]);
+      });
+    }
+
+    frontier = nextFrontier;
+  }
+
+  return false;
+};
+
+const carveFloor = (layer, row, col) => {
+  if (isInBounds(row, col) && layer[row][col] === WALL) {
+    layer[row][col] = FLOOR;
+  }
+};
+
+const ensurePath = (layer, start, end) => {
+  if (hasPath(layer, start, end)) {
+    return;
+  }
+
+  let row = start.row;
+  let col = start.col;
+
+  while (row !== end.row) {
+    row += Math.sign(end.row - row);
+    carveFloor(layer, row, col);
+  }
+
+  while (col !== end.col) {
+    col += Math.sign(end.col - col);
+    carveFloor(layer, row, col);
+  }
+};
+
+const stampRequiredTiles = (layer) => {
+  carveFloor(layer, PLAYER_START.row, PLAYER_START.col);
+  layer[PLAYER_START.row][PLAYER_START.col] = FLOOR;
+  carveFloor(layer, STALKER_START.row, STALKER_START.col);
+  layer[STALKER_START.row][STALKER_START.col] = FLOOR;
+  layer[EXIT_DOOR.row][EXIT_DOOR.col] = DOOR;
+};
+
+const generateMazeLayer = () => {
+  const layer = createWalledGrid();
+  const stack = [[1, 1]];
+
+  layer[1][1] = FLOOR;
+
+  const directions = [
+    [-2, 0],
+    [2, 0],
+    [0, -2],
+    [0, 2],
+  ];
+
+  while (stack.length > 0) {
+    const [row, col] = stack[stack.length - 1];
+    const candidates = shuffleTiles(
+      directions
+        .map(([dRow, dCol]) => ({
+          nextRow: row + dRow,
+          nextCol: col + dCol,
+          wallRow: row + dRow / 2,
+          wallCol: col + dCol / 2,
+        }))
+        .filter(({ nextRow, nextCol }) => (
+          nextRow > 0
+          && nextRow < ROWS - 1
+          && nextCol > 0
+          && nextCol < COLS - 1
+          && layer[nextRow][nextCol] === WALL
+        )),
+    );
+
+    if (candidates.length === 0) {
+      stack.pop();
+      continue;
+    }
+
+    const { nextRow, nextCol, wallRow, wallCol } = candidates[0];
+    layer[nextRow][nextCol] = FLOOR;
+    layer[wallRow][wallCol] = FLOOR;
+    stack.push([nextRow, nextCol]);
+  }
+
+  stampRequiredTiles(layer);
+  ensurePath(layer, PLAYER_START, EXIT_DOOR);
+  ensurePath(layer, STALKER_START, EXIT_DOOR);
+
+  return layer;
+};
+
+const createRandomMap = () => [
+  generateMazeLayer(),
+  generateMazeLayer(),
+];
+
 const createPlayingState = () => {
-  const map = placeRandomCubes(cloneMap([LAYER_0, LAYER_1]));
+  const map = placeRandomCubes(createRandomMap());
   const seen = createEmptySeen(map.length);
 
   if (!isNotWall(map, 0, PLAYER_START.row, PLAYER_START.col)) {
@@ -325,6 +433,7 @@ const handleShift = () => {
   }
 
   state = nextState;
+  state = runStalkerTurn(state, 0);
   isShiftOnCooldown = true;
   setTimeout(() => {
     isShiftOnCooldown = false;
@@ -425,6 +534,18 @@ const checkStalkerCollision = (gameState) => {
   return gameState;
 };
 
+const runStalkerTurn = (gameState, bonusSteps = 0) => {
+  let nextState = gameState;
+  const totalSteps = 1 + bonusSteps;
+
+  for (let step = 0; step < totalSteps && nextState.gameStatus === 'playing'; step += 1) {
+    nextState = moveStalker(nextState);
+    nextState = checkStalkerCollision(nextState);
+  }
+
+  return nextState;
+};
+
 const collectCube = (gameState) => {
   const { player, currentLayer, map, score } = gameState;
   const tile = map[currentLayer][player.row][player.col];
@@ -488,12 +609,15 @@ const handleInput = (key) => {
 
   state = movePlayer(state, delta[0], delta[1]);
   state = updateSeen(state);
+
+  const scoreBeforeCube = state.score;
   state = collectCube(state);
+  const collectedCube = state.score > scoreBeforeCube;
+
   state = checkExit(state);
 
   if (state.gameStatus === 'playing') {
-    state = moveStalker(state);
-    state = checkStalkerCollision(state);
+    state = runStalkerTurn(state, collectedCube ? STALKER_BONUS_STEPS_ON_CUBE : 0);
   }
 
   if (state.gameStatus === 'won' || state.gameStatus === 'lost') {
