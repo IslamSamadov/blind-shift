@@ -462,6 +462,11 @@ let isShiftOnCooldown = false;
 const applyDimensionTheme = (layer) => {
   document.body.classList.toggle('red-dimension', layer === 0);
   document.body.classList.toggle('blue-dimension', layer === 1);
+  
+  // Shift the audio texture to match the CSS color!
+  if (typeof shiftSoundtrackTheme === 'function') {
+    shiftSoundtrackTheme(layer);
+  }
 };
 
 const canShift = (gameState) => {
@@ -510,6 +515,11 @@ const handleShift = () => {
   }
 
   state = nextState;
+  if (state.gameStatus === 'lost') {
+  finishGame();
+  return;
+  }
+
   playShiftSound();
 
   if (getDifficultyConfig(state.difficulty).stalkerMovesOnShift) {
@@ -707,6 +717,10 @@ const updateHud = () => {
 };
 
 const handleInput = (key) => {
+  if (state.gameStatus === 'won' || state.gameStatus === 'lost') {
+  finishGame();
+  return;
+ }
   const moves = {
     ArrowUp: [-1, 0],
     ArrowDown: [1, 0],
