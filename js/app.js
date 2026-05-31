@@ -4,31 +4,57 @@ const ROWS = 11;
 
 const WALL = 1;
 const FLOOR = 0;
+const CUBE = 2;
 
 const LAYER_0 = [
   [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-  [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1],
+  [1, 0, 0, 2, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1],
   [1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1],
-  [1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1],
+  [1, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 1, 0, 1],
   [1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1],
   [1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1],
   [1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1],
-  [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1],
+  [1, 0, 0, 0, 0, 0, 1, 0, 2, 0, 0, 0, 0, 0, 1],
   [1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1],
-  [1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+  [1, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 0, 0, 1],
   [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
 ];
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
+const hud = document.getElementById('hud');
 
-const createInitialState = () => ({
-  currentLayer: 0,
-  player: { row: 1, col: 1 },
-  stalker: { row: 9, col: 13 },
-  caught: false,
-  map: [LAYER_0],
-});
+const cloneMap = (map) => map.map((layer) => layer.map((row) => [...row]));
+
+const countCubes = (map) => {
+  let total = 0;
+
+  map.forEach((layer) => {
+    layer.forEach((row) => {
+      row.forEach((tile) => {
+        if (tile === CUBE) {
+          total += 1;
+        }
+      });
+    });
+  });
+
+  return total;
+};
+
+const createInitialState = () => {
+  const map = cloneMap([LAYER_0]);
+
+  return {
+    currentLayer: 0,
+    player: { row: 1, col: 1 },
+    stalker: { row: 9, col: 13 },
+    score: 0,
+    totalCubes: countCubes(map),
+    gameStatus: 'playing',
+    map,
+  };
+};
 
 let state = createInitialState();
 
@@ -87,10 +113,35 @@ const checkStalkerCollision = (gameState) => {
   const { player, stalker } = gameState;
 
   if (player.row === stalker.row && player.col === stalker.col) {
-    return { ...gameState, caught: true };
+    return { ...gameState, gameStatus: 'lost' };
   }
 
   return gameState;
+};
+
+const collectCube = (gameState) => {
+  const { player, currentLayer, map, score } = gameState;
+  const tile = map[currentLayer][player.row][player.col];
+
+  if (tile !== CUBE) {
+    return gameState;
+  }
+
+  const newMap = cloneMap(map);
+  newMap[currentLayer][player.row][player.col] = FLOOR;
+  const newScore = score + 1;
+  const cubesRemaining = countCubes(newMap);
+
+  return {
+    ...gameState,
+    map: newMap,
+    score: newScore,
+    gameStatus: cubesRemaining === 0 ? 'won' : gameState.gameStatus,
+  };
+};
+
+const updateHud = () => {
+  hud.textContent = `Cubes: ${state.score} / ${state.totalCubes}`;
 };
 
 const handleInput = (key) => {
@@ -110,13 +161,19 @@ const handleInput = (key) => {
   };
 
   const delta = moves[key];
-  if (!delta || state.caught) {
+  if (!delta || state.gameStatus !== 'playing') {
     return;
   }
 
   state = movePlayer(state, delta[0], delta[1]);
-  state = moveStalker(state);
-  state = checkStalkerCollision(state);
+  state = collectCube(state);
+
+  if (state.gameStatus === 'playing') {
+    state = moveStalker(state);
+    state = checkStalkerCollision(state);
+  }
+
+  updateHud();
 };
 
 const drawEntity = (row, col, color, radius = TILE / 3) => {
@@ -142,20 +199,44 @@ const renderStalker = (row, col) => {
   ctx.fill();
 };
 
+const renderCube = (row, col) => {
+  const x = col * TILE + TILE / 2;
+  const y = row * TILE + TILE / 2;
+  const size = TILE / 4;
+
+  ctx.fillStyle = '#7ec8ff';
+  ctx.fillRect(x - size, y - size, size * 2, size * 2);
+  ctx.strokeStyle = '#c8e8ff';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x - size, y - size, size * 2, size * 2);
+};
+
+const renderOverlay = (title, subtitle, color) => {
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = color;
+  ctx.font = 'bold 28px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(title, canvas.width / 2, canvas.height / 2 - 10);
+  ctx.font = '16px system-ui, sans-serif';
+  ctx.fillText(subtitle, canvas.width / 2, canvas.height / 2 + 22);
+};
+
 const render = () => {
   const layer = state.map[state.currentLayer];
   const { row: playerRow, col: playerCol } = state.player;
   const { row: stalkerRow, col: stalkerCol } = state.stalker;
 
-  ctx.fillStyle = state.caught ? '#3a0808' : '#0d0505';
+  ctx.fillStyle = state.gameStatus === 'lost' ? '#3a0808' : '#0d0505';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   for (let row = 0; row < ROWS; row += 1) {
     for (let col = 0; col < COLS; col += 1) {
       const x = col * TILE;
       const y = row * TILE;
+      const tile = layer[row][col];
 
-      if (layer[row][col] === WALL) {
+      if (tile === WALL) {
         ctx.fillStyle = '#5c2020';
       } else {
         ctx.fillStyle = '#2a1212';
@@ -164,19 +245,22 @@ const render = () => {
       ctx.fillRect(x, y, TILE, TILE);
       ctx.strokeStyle = '#1a0a0a';
       ctx.strokeRect(x, y, TILE, TILE);
+
+      if (tile === CUBE) {
+        renderCube(row, col);
+      }
     }
   }
 
   renderStalker(stalkerRow, stalkerCol);
   drawEntity(playerRow, playerCol, '#f5d76e');
 
-  if (state.caught) {
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#ff6666';
-    ctx.font = 'bold 28px system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('Caught!', canvas.width / 2, canvas.height / 2);
+  if (state.gameStatus === 'lost') {
+    renderOverlay('You Lose', `Collected ${state.score} / ${state.totalCubes} cubes`, '#ff6666');
+  }
+
+  if (state.gameStatus === 'won') {
+    renderOverlay('You Win', `All ${state.totalCubes} cubes collected`, '#7ec8ff');
   }
 };
 
@@ -208,3 +292,4 @@ window.addEventListener('keydown', (event) => {
 });
 
 gameLoop();
+updateHud();

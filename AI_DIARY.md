@@ -32,3 +32,17 @@ While structurally fascinating, the 9-grid layout and hypercube math were far to
 I guided the AI to pivot toward a 2D perspective-shifting game with an atmospheric horror element. We combined a limited-light "flashlight" radius with a simple 3D array (`[layer][row][column]`). Instead of displaying multiple mazes at once, the player stays on one clean 2D screen and presses Spacebar to phase-shift layers, using the geometry of one layer to trap a monster following them in another.
 
 **Time lost:** ~20 minutes of conceptual shifting.
+
+---
+
+### [May 31, 2026] - Stalker walked through walls
+
+**What I asked the AI:** "Write the stalker movement function. It should move one step toward the player every tick."
+
+**What it gave me:** A function that calculated `dx = playerX - stalkerX` and `dy = playerY - stalkerY`, then moved the stalker one step in whichever direction had the larger difference (Chebyshev-style movement).
+
+**What was wrong:** The stalker completely ignored walls. It would slide through any wall tile in the current dimension because the function never checked whether the target tile was passable before moving. The stalker could teleport through entire wall sections and instantly reach the player.
+
+**How I fixed it:** I added a wall check before applying the move. I read the `map[currentLayer][newRow][newCol]` value first and only updated the stalker's position if that tile was not a wall (`!== 1`). If the direct path was blocked I tried moving on just one axis at a time as a fallback.
+
+**Time lost:** ~25 minutes
