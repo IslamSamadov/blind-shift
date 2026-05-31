@@ -67,12 +67,10 @@ const getHighScore = () => {
 
 const saveHighScore = (score) => {
   const currentBest = getHighScore();
-
   if (score > currentBest) {
     localStorage.setItem(HIGH_SCORE_KEY, String(score));
     return true;
   }
-
   return false;
 };
 
@@ -83,7 +81,6 @@ const updateHighScoreDisplay = () => {
 const showJumpscare = (callback) => {
   jumpscare.classList.remove('hidden');
   jumpscare.setAttribute('aria-hidden', 'false');
-
   setTimeout(() => {
     jumpscare.classList.add('hidden');
     jumpscare.setAttribute('aria-hidden', 'true');
@@ -92,10 +89,7 @@ const showJumpscare = (callback) => {
 };
 
 const finishGame = () => {
-  if (pendingGameOver) {
-    return;
-  }
-
+  if (pendingGameOver) return;
   pendingGameOver = true;
   stopSoundtrack();
 
@@ -114,33 +108,23 @@ const isInBounds = (row, col) => (
 );
 
 const isNotWall = (map, layer, row, col) => {
-  if (!isInBounds(row, col)) {
-    return false;
-  }
-
+  if (!isInBounds(row, col)) return false;
   return map[layer][row][col] !== WALL;
 };
 
 const isWalkable = (map, layer, row, col, score, totalCubes) => {
-  if (!isInBounds(row, col)) {
-    return false;
-  }
-
+  if (!isInBounds(row, col)) return false;
   const tile = map[layer][row][col];
-
-  if (tile === WALL) {
-    return false;
-  }
-
-  if (tile === DOOR && score < totalCubes) {
-    return false;
-  }
-
+  if (tile === WALL) return false;
+  if (tile === DOOR && score < totalCubes) return false;
   return true;
 };
 
-const resolveStalkerPosition = (map, layer, row, col) => {
-  if (isNotWall(map, layer, row, col)) {
+// FIX 2: resolveStalkerPosition now receives the player position and skips
+// that tile during BFS, so the stalker can never spawn on top of the player.
+const resolveStalkerPosition = (map, layer, row, col, playerRow, playerCol) => {
+  if (isNotWall(map, layer, row, col)
+      && !(row === playerRow && col === playerCol)) {
     return { row, col };
   }
 
@@ -163,11 +147,11 @@ const resolveStalkerPosition = (map, layer, row, col) => {
         const [nextRow, nextCol] = neighbors[j];
         const key = `${nextRow},${nextCol}`;
 
-        if (visited.has(key) || !isInBounds(nextRow, nextCol)) {
-          continue;
-        }
-
+        if (visited.has(key) || !isInBounds(nextRow, nextCol)) continue;
         visited.add(key);
+
+        // Skip the player's tile — stalker must not resolve onto the player
+        if (nextRow === playerRow && nextCol === playerCol) continue;
 
         if (isNotWall(map, layer, nextRow, nextCol)) {
           return { row: nextRow, col: nextCol };
@@ -198,7 +182,6 @@ const cloneSeen = (seen) => seen.map((layer) => layer.map((row) => [...row]));
 const isInLight = (row, col, playerRow, playerCol, lightRadius) => {
   const dx = col - playerCol;
   const dy = row - playerRow;
-
   return Math.sqrt((dx * dx) + (dy * dy)) <= lightRadius;
 };
 
@@ -220,58 +203,40 @@ const updateSeen = (gameState) => {
 
 const countCubes = (map) => {
   let total = 0;
-
   map.forEach((layer) => {
     layer.forEach((row) => {
-      row.forEach((tile) => {
-        if (tile === CUBE) {
-          total += 1;
-        }
-      });
+      row.forEach((tile) => { if (tile === CUBE) total += 1; });
     });
   });
-
   return total;
 };
 
 const getReservedTiles = () => {
   const reserved = new Set();
-
   [PLAYER_START, STALKER_START, EXIT_DOOR].forEach(({ row, col }) => {
     reserved.add(`${row},${col}`);
   });
-
   return reserved;
 };
 
 const shuffleTiles = (tiles) => {
   const shuffled = [...tiles];
-
   for (let i = shuffled.length - 1; i > 0; i -= 1) {
     const j = Math.floor(Math.random() * (i + 1));
     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
-
   return shuffled;
 };
 
 const getOpenFloorTiles = (map, layer, reserved) => {
   const tiles = [];
-
   for (let row = 0; row < ROWS; row += 1) {
     for (let col = 0; col < COLS; col += 1) {
-      if (map[layer][row][col] !== FLOOR) {
-        continue;
-      }
-
-      if (reserved.has(`${row},${col}`)) {
-        continue;
-      }
-
+      if (map[layer][row][col] !== FLOOR) continue;
+      if (reserved.has(`${row},${col}`)) continue;
       tiles.push({ row, col });
     }
   }
-
   return tiles;
 };
 
@@ -308,10 +273,7 @@ const hasPath = (layer, start, end) => {
 
     for (let i = 0; i < frontier.length; i += 1) {
       const [row, col] = frontier[i];
-
-      if (row === end.row && col === end.col) {
-        return true;
-      }
+      if (row === end.row && col === end.col) return true;
 
       [
         [row - 1, col],
@@ -320,15 +282,8 @@ const hasPath = (layer, start, end) => {
         [row, col + 1],
       ].forEach(([nextRow, nextCol]) => {
         const key = `${nextRow},${nextCol}`;
-
-        if (visited.has(key) || !isInBounds(nextRow, nextCol)) {
-          return;
-        }
-
-        if (!isTraversibleTile(layer[nextRow][nextCol])) {
-          return;
-        }
-
+        if (visited.has(key) || !isInBounds(nextRow, nextCol)) return;
+        if (!isTraversibleTile(layer[nextRow][nextCol])) return;
         visited.add(key);
         nextFrontier.push([nextRow, nextCol]);
       });
@@ -347,9 +302,7 @@ const carveFloor = (layer, row, col) => {
 };
 
 const ensurePath = (layer, start, end) => {
-  if (hasPath(layer, start, end)) {
-    return;
-  }
+  if (hasPath(layer, start, end)) return;
 
   let row = start.row;
   let col = start.col;
@@ -376,15 +329,9 @@ const stampRequiredTiles = (layer) => {
 const generateMazeLayer = () => {
   const layer = createWalledGrid();
   const stack = [[1, 1]];
-
   layer[1][1] = FLOOR;
 
-  const directions = [
-    [-2, 0],
-    [2, 0],
-    [0, -2],
-    [0, 2],
-  ];
+  const directions = [[-2, 0], [2, 0], [0, -2], [0, 2]];
 
   while (stack.length > 0) {
     const [row, col] = stack[stack.length - 1];
@@ -436,7 +383,12 @@ const createPlayingState = () => {
     throw new Error('Player spawn is blocked by a wall.');
   }
 
-  const stalker = resolveStalkerPosition(map, 0, STALKER_START.row, STALKER_START.col);
+  // FIX 2: pass player position so stalker cannot resolve onto the player tile
+  const stalker = resolveStalkerPosition(
+    map, 0,
+    STALKER_START.row, STALKER_START.col,
+    PLAYER_START.row, PLAYER_START.col,
+  );
 
   return updateSeen({
     currentLayer: 0,
@@ -462,8 +414,6 @@ let isShiftOnCooldown = false;
 const applyDimensionTheme = (layer) => {
   document.body.classList.toggle('red-dimension', layer === 0);
   document.body.classList.toggle('blue-dimension', layer === 1);
-  
-  // Shift the audio texture to match the CSS color!
   if (typeof shiftSoundtrackTheme === 'function') {
     shiftSoundtrackTheme(layer);
   }
@@ -472,22 +422,20 @@ const applyDimensionTheme = (layer) => {
 const canShift = (gameState) => {
   const nextLayer = gameState.currentLayer === 0 ? 1 : 0;
   const { player, map } = gameState;
-
   return isNotWall(map, nextLayer, player.row, player.col);
 };
 
 const shiftDimension = (gameState) => {
-  if (!canShift(gameState)) {
-    return gameState;
-  }
+  if (!canShift(gameState)) return gameState;
 
   const nextLayer = gameState.currentLayer === 0 ? 1 : 0;
-  const { stalker, map } = gameState;
+  const { stalker, map, player } = gameState;
+
+  // FIX 2: pass player position into resolve so stalker BFS skips the player's tile
   const resolvedStalker = resolveStalkerPosition(
-    map,
-    nextLayer,
-    stalker.row,
-    stalker.col,
+    map, nextLayer,
+    stalker.row, stalker.col,
+    player.row, player.col,
   );
 
   let newState = {
@@ -498,26 +446,36 @@ const shiftDimension = (gameState) => {
 
   newState = updateSeen(newState);
   applyDimensionTheme(nextLayer);
+
+  // Check stalker collision first (stalker may have resolved onto player tile
+  // even after the fix in edge cases where all nearby tiles are the player's)
   newState = checkStalkerCollision(newState);
+  if (newState.gameStatus !== 'playing') return newState;
+
+  // FIX 1: collect cube and check exit after shifting — player may have
+  // landed on a cube tile in the new dimension
+  const scoreBeforeShiftCube = newState.score;
+  newState = collectCube(newState);
+  if (newState.score > scoreBeforeShiftCube) {
+    playCubeSound();
+    updateHud();
+  }
+  newState = checkExit(newState);
 
   return newState;
 };
 
 const handleShift = () => {
-  if (state.gameStatus !== 'playing' || isShiftOnCooldown) {
-    return;
-  }
+  if (state.gameStatus !== 'playing' || isShiftOnCooldown) return;
 
   const nextState = shiftDimension(state);
-
-  if (nextState === state) {
-    return;
-  }
+  if (nextState === state) return;
 
   state = nextState;
+
   if (state.gameStatus === 'lost') {
-  finishGame();
-  return;
+    finishGame();
+    return;
   }
 
   playShiftSound();
@@ -527,9 +485,7 @@ const handleShift = () => {
   }
 
   isShiftOnCooldown = true;
-  setTimeout(() => {
-    isShiftOnCooldown = false;
-  }, SHIFT_COOLDOWN_MS);
+  setTimeout(() => { isShiftOnCooldown = false; }, SHIFT_COOLDOWN_MS);
 
   if (state.gameStatus === 'won' || state.gameStatus === 'lost') {
     finishGame();
@@ -540,14 +496,10 @@ const handleShift = () => {
 
 const restartGame = () => {
   stopSoundtrack();
-
   state = createPreviewState();
-
   gameOverScreen.classList.add('hidden');
   hud.classList.add('hidden');
-
   startScreen.classList.remove('hidden');
-
   updateHint();
 };
 
@@ -556,14 +508,11 @@ const updateHint = () => {
     hintEl.textContent = 'Choose Easy or Hard — Hard: stalker reacts to shifts and cubes';
     return;
   }
-
   const config = getDifficultyConfig(state.difficulty);
-
   if (config.stalkerMovesOnShift) {
     hintEl.textContent = 'Hard mode · WASD to move · Space shifts (stalker reacts) · Cubes draw him closer';
     return;
   }
-
   hintEl.textContent = 'Easy mode · WASD to move · Space to shift safely · Stalker still hunts on every move';
 };
 
@@ -614,25 +563,15 @@ const movePlayer = (gameState, dRow, dCol) => {
   const { row, col } = gameState.player;
   const nextRow = row + dRow;
   const nextCol = col + dCol;
-
-  if (!isPassable(gameState.currentLayer, nextRow, nextCol)) {
-    return gameState;
-  }
-
-  return {
-    ...gameState,
-    player: { row: nextRow, col: nextCol },
-  };
+  if (!isPassable(gameState.currentLayer, nextRow, nextCol)) return gameState;
+  return { ...gameState, player: { row: nextRow, col: nextCol } };
 };
 
 const moveStalker = (gameState) => {
   const { player, stalker, currentLayer } = gameState;
   const dRow = player.row - stalker.row;
   const dCol = player.col - stalker.col;
-
-  if (dRow === 0 && dCol === 0) {
-    return gameState;
-  }
+  if (dRow === 0 && dCol === 0) return gameState;
 
   const attempts = Math.abs(dRow) >= Math.abs(dCol)
     ? [[Math.sign(dRow), 0], [0, Math.sign(dCol)]]
@@ -641,12 +580,8 @@ const moveStalker = (gameState) => {
   for (const [stepRow, stepCol] of attempts) {
     const nextRow = stalker.row + stepRow;
     const nextCol = stalker.col + stepCol;
-
     if (isPassable(currentLayer, nextRow, nextCol)) {
-      return {
-        ...gameState,
-        stalker: { row: nextRow, col: nextCol },
-      };
+      return { ...gameState, stalker: { row: nextRow, col: nextCol } };
     }
   }
 
@@ -655,56 +590,39 @@ const moveStalker = (gameState) => {
 
 const checkStalkerCollision = (gameState) => {
   const { player, stalker } = gameState;
-
   if (player.row === stalker.row && player.col === stalker.col) {
     return { ...gameState, gameStatus: 'lost' };
   }
-
   return gameState;
 };
 
 const runStalkerTurn = (gameState, bonusSteps = 0) => {
   let nextState = gameState;
   const totalSteps = 1 + bonusSteps;
-
   for (let step = 0; step < totalSteps && nextState.gameStatus === 'playing'; step += 1) {
     nextState = moveStalker(nextState);
     nextState = checkStalkerCollision(nextState);
   }
-
   return nextState;
 };
 
 const collectCube = (gameState) => {
   const { player, currentLayer, map, score } = gameState;
   const tile = map[currentLayer][player.row][player.col];
-
-  if (tile !== CUBE) {
-    return gameState;
-  }
+  if (tile !== CUBE) return gameState;
 
   const newMap = cloneMap(map);
   newMap[currentLayer][player.row][player.col] = FLOOR;
-  const newScore = score + 1;
 
-  return {
-    ...gameState,
-    map: newMap,
-    score: newScore,
-  };
+  return { ...gameState, map: newMap, score: score + 1 };
 };
 
 const checkExit = (gameState) => {
-  if (!allCubesCollected(gameState)) {
-    return gameState;
-  }
-
+  if (!allCubesCollected(gameState)) return gameState;
   const { player, currentLayer, map } = gameState;
-
   if (map[currentLayer][player.row][player.col] === DOOR) {
     return { ...gameState, gameStatus: 'won' };
   }
-
   return gameState;
 };
 
@@ -712,34 +630,26 @@ const updateHud = () => {
   const layerName = LAYER_NAMES[state.currentLayer];
   const exitStatus = allCubesCollected(state) ? 'Exit unlocked' : 'Exit locked';
   const modeName = getDifficultyConfig(state.difficulty).label;
-
   hud.textContent = `Cubes: ${state.score} / ${state.totalCubes} | ${modeName} | ${layerName} | ${exitStatus} | Best: ${getHighScore()}`;
 };
 
 const handleInput = (key) => {
   if (state.gameStatus === 'won' || state.gameStatus === 'lost') {
-  finishGame();
-  return;
- }
+    finishGame();
+    return;
+  }
+
   const moves = {
-    ArrowUp: [-1, 0],
-    ArrowDown: [1, 0],
-    ArrowLeft: [0, -1],
-    ArrowRight: [0, 1],
-    w: [-1, 0],
-    W: [-1, 0],
-    s: [1, 0],
-    S: [1, 0],
-    a: [0, -1],
-    A: [0, -1],
-    d: [0, 1],
-    D: [0, 1],
+    ArrowUp: [-1, 0], ArrowDown: [1, 0],
+    ArrowLeft: [0, -1], ArrowRight: [0, 1],
+    w: [-1, 0], W: [-1, 0],
+    s: [1, 0],  S: [1, 0],
+    a: [0, -1], A: [0, -1],
+    d: [0, 1],  D: [0, 1],
   };
 
   const delta = moves[key];
-  if (!delta || state.gameStatus !== 'playing') {
-    return;
-  }
+  if (!delta || state.gameStatus !== 'playing') return;
 
   state = movePlayer(state, delta[0], delta[1]);
   state = updateSeen(state);
@@ -748,9 +658,7 @@ const handleInput = (key) => {
   state = collectCube(state);
   const collectedCube = state.score > scoreBeforeCube;
 
-  if (collectedCube) {
-    playCubeSound();
-  }
+  if (collectedCube) playCubeSound();
 
   state = checkExit(state);
 
@@ -769,7 +677,6 @@ const handleInput = (key) => {
 const drawEntity = (row, col, color, radius = TILE / 3) => {
   const x = col * TILE + TILE / 2;
   const y = row * TILE + TILE / 2;
-
   ctx.fillStyle = color;
   ctx.beginPath();
   ctx.arc(x, y, radius, 0, Math.PI * 2);
@@ -778,10 +685,8 @@ const drawEntity = (row, col, color, radius = TILE / 3) => {
 
 const renderStalker = (row, col) => {
   drawEntity(row, col, '#1a1028');
-
   const x = col * TILE + TILE / 2;
   const y = row * TILE + TILE / 2;
-
   ctx.fillStyle = '#ff4444';
   ctx.beginPath();
   ctx.arc(x - 4, y - 2, 3, 0, Math.PI * 2);
@@ -793,7 +698,6 @@ const renderCube = (row, col) => {
   const x = col * TILE + TILE / 2;
   const y = row * TILE + TILE / 2;
   const size = TILE / 4;
-
   ctx.fillStyle = '#7ec8ff';
   ctx.fillRect(x - size, y - size, size * 2, size * 2);
   ctx.strokeStyle = '#c8e8ff';
@@ -806,13 +710,11 @@ const renderDoor = (row, col, unlocked) => {
   const y = row * TILE + TILE / 2;
   const width = TILE / 2;
   const height = (TILE * 2) / 3;
-
   ctx.fillStyle = unlocked ? '#6bdc6b' : '#4a3030';
   ctx.fillRect(x - width / 2, y - height / 2, width, height);
   ctx.strokeStyle = unlocked ? '#c8ffc8' : '#8a5050';
   ctx.lineWidth = 2;
   ctx.strokeRect(x - width / 2, y - height / 2, width, height);
-
   if (!unlocked) {
     ctx.strokeStyle = '#ff6666';
     ctx.beginPath();
@@ -828,15 +730,10 @@ const renderTile = (row, col, tile, lit, layer) => {
   const x = col * TILE;
   const y = row * TILE;
   const colors = TILE_COLORS[layer];
-
-  if (tile === WALL) {
-    ctx.fillStyle = lit ? colors.wallLit : colors.wallDim;
-  } else {
-    ctx.fillStyle = lit ? colors.floorLit : colors.floorDim;
-  }
-
+  ctx.fillStyle = tile === WALL
+    ? (lit ? colors.wallLit : colors.wallDim)
+    : (lit ? colors.floorLit : colors.floorDim);
   ctx.fillRect(x, y, TILE, TILE);
-
   if (lit) {
     ctx.strokeStyle = layer === 0 ? '#1a0a0a' : '#0a0a1a';
     ctx.strokeRect(x, y, TILE, TILE);
@@ -858,20 +755,12 @@ const render = () => {
     for (let col = 0; col < COLS; col += 1) {
       const lit = isInLight(row, col, playerRow, playerCol, lightRadius);
       const explored = seenLayer[row][col];
-
-      if (!lit && !explored) {
-        continue;
-      }
+      if (!lit && !explored) continue;
 
       renderTile(row, col, layer[row][col], lit, currentLayer);
 
-      if (lit && layer[row][col] === CUBE) {
-        renderCube(row, col);
-      }
-
-      if (lit && layer[row][col] === DOOR) {
-        renderDoor(row, col, allCubesCollected(state));
-      }
+      if (lit && layer[row][col] === CUBE) renderCube(row, col);
+      if (lit && layer[row][col] === DOOR) renderDoor(row, col, allCubesCollected(state));
     }
   }
 
@@ -893,19 +782,16 @@ window.addEventListener('keydown', (event) => {
     startGame('easy');
     return;
   }
-
   if (state.gameStatus === 'start' && event.key === '2') {
     event.preventDefault();
     startGame('hard');
     return;
   }
-
   if (state.gameStatus === 'start' && (event.key === 'Enter' || event.key === ' ')) {
     event.preventDefault();
     startGame('hard');
     return;
   }
-
   if ((state.gameStatus === 'won' || state.gameStatus === 'lost')
     && (event.key === 'Enter' || event.key === ' ' || event.key === 'r' || event.key === 'R')) {
     event.preventDefault();
@@ -913,21 +799,7 @@ window.addEventListener('keydown', (event) => {
     return;
   }
 
-  const movementKeys = [
-    'ArrowUp',
-    'ArrowDown',
-    'ArrowLeft',
-    'ArrowRight',
-    'w',
-    'W',
-    'a',
-    'A',
-    's',
-    'S',
-    'd',
-    'D',
-  ];
-
+  const movementKeys = ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','w','W','a','A','s','S','d','D'];
   if (movementKeys.includes(event.key)) {
     event.preventDefault();
     handleInput(event.key);
