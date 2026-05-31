@@ -77,6 +77,7 @@ const finishGame = () => {
   }
 
   pendingGameOver = true;
+  stopSoundtrack();
 
   if (state.gameStatus === 'lost') {
     playScreamSound();
@@ -506,7 +507,6 @@ const restartGame = () => {
 };
 
 const startGame = () => {
-  initAudio();
   pendingGameOver = false;
   jumpscare.classList.add('hidden');
   state = createPlayingState();
@@ -517,6 +517,7 @@ const startGame = () => {
   gameOverScreen.classList.remove('win', 'lost');
   hud.classList.remove('hidden');
   updateHud();
+  startSoundtrack();
 };
 
 const showGameOver = () => {
