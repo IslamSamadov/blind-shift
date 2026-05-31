@@ -5,11 +5,16 @@ const ROWS = 11;
 const WALL = 1;
 const FLOOR = 0;
 const CUBE = 2;
+const DOOR = 3;
 const LIGHT_RADIUS = 2.5;
+
+const PLAYER_START = { row: 1, col: 1 };
+const STALKER_START = { row: 9, col: 13 };
+const EXIT_DOOR = { row: 1, col: 13 };
 
 const LAYER_0 = [
   [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-  [1, 0, 0, 2, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1],
+  [1, 0, 0, 2, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 3],
   [1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1],
   [1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1],
   [1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1],
@@ -23,7 +28,7 @@ const LAYER_0 = [
 
 const LAYER_1 = [
   [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-  [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 1],
+  [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 3],
   [1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1],
   [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
   [1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1],
@@ -53,7 +58,83 @@ const gameOverMessage = document.getElementById('game-over-message');
 const startBtn = document.getElementById('start-btn');
 const restartBtn = document.getElementById('restart-btn');
 
+const isInBounds = (row, col) => (
+  row >= 0 && row < ROWS && col >= 0 && col < COLS
+);
+
+const isNotWall = (map, layer, row, col) => {
+  if (!isInBounds(row, col)) {
+    return false;
+  }
+
+  return map[layer][row][col] !== WALL;
+};
+
+const isWalkable = (map, layer, row, col, score, totalCubes) => {
+  if (!isInBounds(row, col)) {
+    return false;
+  }
+
+  const tile = map[layer][row][col];
+
+  if (tile === WALL) {
+    return false;
+  }
+
+  if (tile === DOOR && score < totalCubes) {
+    return false;
+  }
+
+  return true;
+};
+
+const resolveStalkerPosition = (map, layer, row, col) => {
+  if (isNotWall(map, layer, row, col)) {
+    return { row, col };
+  }
+
+  const visited = new Set([`${row},${col}`]);
+  let frontier = [[row, col]];
+
+  while (frontier.length > 0) {
+    const nextFrontier = [];
+
+    for (let i = 0; i < frontier.length; i += 1) {
+      const [currentRow, currentCol] = frontier[i];
+      const neighbors = [
+        [currentRow - 1, currentCol],
+        [currentRow + 1, currentCol],
+        [currentRow, currentCol - 1],
+        [currentRow, currentCol + 1],
+      ];
+
+      for (let j = 0; j < neighbors.length; j += 1) {
+        const [nextRow, nextCol] = neighbors[j];
+        const key = `${nextRow},${nextCol}`;
+
+        if (visited.has(key) || !isInBounds(nextRow, nextCol)) {
+          continue;
+        }
+
+        visited.add(key);
+
+        if (isNotWall(map, layer, nextRow, nextCol)) {
+          return { row: nextRow, col: nextCol };
+        }
+
+        nextFrontier.push([nextRow, nextCol]);
+      }
+    }
+
+    frontier = nextFrontier;
+  }
+
+  return { row, col };
+};
+
 const cloneMap = (map) => map.map((layer) => layer.map((row) => [...row]));
+
+const allCubesCollected = (gameState) => gameState.score >= gameState.totalCubes;
 
 const createEmptySeen = (layerCount) => (
   Array.from({ length: layerCount }, () => (
@@ -105,10 +186,16 @@ const createPlayingState = () => {
   const map = cloneMap([LAYER_0, LAYER_1]);
   const seen = createEmptySeen(map.length);
 
+  if (!isNotWall(map, 0, PLAYER_START.row, PLAYER_START.col)) {
+    throw new Error('Player spawn is blocked by a wall.');
+  }
+
+  const stalker = resolveStalkerPosition(map, 0, STALKER_START.row, STALKER_START.col);
+
   return updateSeen({
     currentLayer: 0,
-    player: { row: 1, col: 1 },
-    stalker: { row: 9, col: 13 },
+    player: { ...PLAYER_START },
+    stalker,
     score: 0,
     totalCubes: countCubes(map),
     gameStatus: 'playing',
@@ -132,9 +219,9 @@ const applyDimensionTheme = (layer) => {
 
 const canShift = (gameState) => {
   const nextLayer = gameState.currentLayer === 0 ? 1 : 0;
-  const { row, col } = gameState.player;
+  const { player, map } = gameState;
 
-  return gameState.map[nextLayer][row][col] !== WALL;
+  return isNotWall(map, nextLayer, player.row, player.col);
 };
 
 const shiftDimension = (gameState) => {
@@ -143,9 +230,18 @@ const shiftDimension = (gameState) => {
   }
 
   const nextLayer = gameState.currentLayer === 0 ? 1 : 0;
+  const { stalker, map } = gameState;
+  const resolvedStalker = resolveStalkerPosition(
+    map,
+    nextLayer,
+    stalker.row,
+    stalker.col,
+  );
+
   let newState = {
     ...gameState,
     currentLayer: nextLayer,
+    stalker: resolvedStalker,
   };
 
   newState = updateSeen(newState);
@@ -199,7 +295,7 @@ const showGameOver = () => {
 
   if (state.gameStatus === 'won') {
     gameOverTitle.textContent = 'You Win';
-    gameOverMessage.textContent = `All ${state.totalCubes} cubes collected!`;
+    gameOverMessage.textContent = 'All cubes collected — you escaped through the exit!';
     gameOverScreen.classList.add('win');
   } else {
     gameOverTitle.textContent = 'You Lose';
@@ -210,13 +306,9 @@ const showGameOver = () => {
   gameOverScreen.classList.remove('hidden');
 };
 
-const isPassable = (layer, row, col) => {
-  if (row < 0 || row >= ROWS || col < 0 || col >= COLS) {
-    return false;
-  }
-
-  return state.map[layer][row][col] !== WALL;
-};
+const isPassable = (layer, row, col) => (
+  isWalkable(state.map, layer, row, col, state.score, state.totalCubes)
+);
 
 const movePlayer = (gameState, dRow, dCol) => {
   const { row, col } = gameState.player;
@@ -282,19 +374,33 @@ const collectCube = (gameState) => {
   const newMap = cloneMap(map);
   newMap[currentLayer][player.row][player.col] = FLOOR;
   const newScore = score + 1;
-  const cubesRemaining = countCubes(newMap);
 
   return {
     ...gameState,
     map: newMap,
     score: newScore,
-    gameStatus: cubesRemaining === 0 ? 'won' : gameState.gameStatus,
   };
+};
+
+const checkExit = (gameState) => {
+  if (!allCubesCollected(gameState)) {
+    return gameState;
+  }
+
+  const { player, currentLayer, map } = gameState;
+
+  if (map[currentLayer][player.row][player.col] === DOOR) {
+    return { ...gameState, gameStatus: 'won' };
+  }
+
+  return gameState;
 };
 
 const updateHud = () => {
   const layerName = LAYER_NAMES[state.currentLayer];
-  hud.textContent = `Cubes: ${state.score} / ${state.totalCubes} | ${layerName} Dimension`;
+  const exitStatus = allCubesCollected(state) ? 'Exit unlocked' : 'Exit locked';
+
+  hud.textContent = `Cubes: ${state.score} / ${state.totalCubes} | ${layerName} | ${exitStatus}`;
 };
 
 const handleInput = (key) => {
@@ -321,6 +427,7 @@ const handleInput = (key) => {
   state = movePlayer(state, delta[0], delta[1]);
   state = updateSeen(state);
   state = collectCube(state);
+  state = checkExit(state);
 
   if (state.gameStatus === 'playing') {
     state = moveStalker(state);
@@ -369,6 +476,29 @@ const renderCube = (row, col) => {
   ctx.strokeRect(x - size, y - size, size * 2, size * 2);
 };
 
+const renderDoor = (row, col, unlocked) => {
+  const x = col * TILE + TILE / 2;
+  const y = row * TILE + TILE / 2;
+  const width = TILE / 2;
+  const height = (TILE * 2) / 3;
+
+  ctx.fillStyle = unlocked ? '#6bdc6b' : '#4a3030';
+  ctx.fillRect(x - width / 2, y - height / 2, width, height);
+  ctx.strokeStyle = unlocked ? '#c8ffc8' : '#8a5050';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x - width / 2, y - height / 2, width, height);
+
+  if (!unlocked) {
+    ctx.strokeStyle = '#ff6666';
+    ctx.beginPath();
+    ctx.moveTo(x - width / 4, y - height / 4);
+    ctx.lineTo(x + width / 4, y + height / 4);
+    ctx.moveTo(x + width / 4, y - height / 4);
+    ctx.lineTo(x - width / 4, y + height / 4);
+    ctx.stroke();
+  }
+};
+
 const renderTile = (row, col, tile, lit, layer) => {
   const x = col * TILE;
   const y = row * TILE;
@@ -411,6 +541,10 @@ const render = () => {
 
       if (lit && layer[row][col] === CUBE) {
         renderCube(row, col);
+      }
+
+      if (lit && layer[row][col] === DOOR) {
+        renderDoor(row, col, allCubesCollected(state));
       }
     }
   }

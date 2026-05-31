@@ -49,7 +49,7 @@ I guided the AI to pivot toward a 2D perspective-shifting game with an atmospher
 
 ---
 
-### [Date] - Phase shift triggered every frame while holding Spacebar
+### [May 31, 2026] - Phase shift triggered every frame while holding Spacebar
 
 **What I asked the AI:** "Handle keyboard input for movement and phase shifting."
 
@@ -60,3 +60,31 @@ I guided the AI to pivot toward a 2D perspective-shifting game with an atmospher
 **How I fixed it:** I moved the Spacebar listener outside the game loop into a one-time `addEventListener('keydown', ...)` and added a boolean flag `isShiftOnCooldown`. After each shift I set it to `true` and used `setTimeout` to reset it after 300ms, preventing spam.
 
 **Time lost:** ~20 minutes
+
+---
+
+### [May 31, 2026] - Phase shift made stalker spawn in walls
+
+**What I asked the AI:** "Implement layer shifting with Spacebar."
+
+**What it gave me:** First a `canShift()` check for the player only, leaving the stalker able to end up inside walls. A follow-up fix blocked the shift entirely if the stalker's tile was a wall in the target dimension.
+
+**What was wrong:** The stalker keeps the same grid coordinates when you shift. If that tile is a wall in the other dimension, the stalker ended up inside a wall — still drawn on screen and breaking the trap logic. Blocking the shift entirely also felt wrong because it punished the player for a geometry problem that should trap the stalker, not freeze the player.
+
+**How I fixed it:** Instead of blocking the shift, I added `resolveStalkerPosition()` — a BFS search that finds the nearest open tile around the stalker's intended coordinates in the new dimension. On every phase shift, if the stalker's tile is a wall in the target layer, he gets placed on the closest passable floor tile instead. The same helper runs at game start so the stalker never initializes inside a wall.
+
+**Time lost:** ~10 minutes
+
+---
+
+### [May 31, 2026] - Exit door unlocked before all cubes were collected
+
+**What I asked the AI:** "Write the win condition check — the exit should unlock when all cubes are collected."
+
+**What it gave me:** A check that counted cubes remaining in the `map` array and unlocked the exit when the count hit zero.
+
+**What was wrong:** The cube count only checked the *current* layer. If I was in Layer 1 and had collected all Layer 1 cubes, the exit unlocked even though Layer 2 cubes were still sitting there. I could win the game without collecting half the cubes.
+
+**How I fixed it:** I changed the count function to loop over both layers: `map[0]` and `map[1]`. The exit only unlocks when the total cube count across all layers reaches zero.
+
+**Time lost:** ~15 minutes
