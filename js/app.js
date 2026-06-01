@@ -181,9 +181,9 @@ const createEmptySeen = (layerCount) => (
 const cloneSeen = (seen) => seen.map((layer) => layer.map((row) => [...row]));
 
 const isInLight = (row, col, playerRow, playerCol, lightRadius) => {
-  const dx = col - playerCol;
-  const dy = row - playerRow;
-  return Math.sqrt((dx * dx) + (dy * dy)) <= lightRadius;
+  const dx = Math.abs(col - playerCol);
+  const dy = Math.abs(row - playerRow);
+  return Math.max(dx, dy) <= lightRadius;
 };
 
 const updateSeen = (gameState) => {
@@ -887,11 +887,11 @@ const renderDoor = (row, col, unlocked) => {
 
 // Brightness falloff — 1.0 at player, 0.0 at radius edge
 const getLightBrightness = (row, col, playerRow, playerCol, lightRadius) => {
-  const dx = col - playerCol;
-  const dy = row - playerRow;
-  const dist = Math.sqrt(dx * dx + dy * dy);
+  const dx = Math.abs(col - playerCol);
+  const dy = Math.abs(row - playerRow);
+  const dist = Math.max(dx, dy); // Chebyshev — diagonals same as straights
   if (dist > lightRadius) return 0;
-  return Math.max(0, 1 - (dist / lightRadius) ** 1.1); // gentler falloff = brighter overall
+  return Math.max(0, 1 - (dist / lightRadius) ** 1.1);
 };
 
 const renderTile = (row, col, tile, brightness, explored, layer) => {
@@ -1143,4 +1143,4 @@ document.getElementById('mobile-shift-btn').addEventListener('click', () => hand
 
 updateHighScoreDisplay();
 updateHint();
-gameLoop();
+gameLoop(); 
