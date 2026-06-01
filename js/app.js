@@ -122,14 +122,18 @@ const isWalkable = (map, layer, row, col, score, totalCubes) => {
   return true;
 };
 
-// FIX 2: resolveStalkerPosition now receives the player position and skips
-// that tile during BFS, so the stalker can never spawn on top of the player.
-const resolveStalkerPosition = (map, layer, row, col, playerRow, playerCol) => {
-  if (isNotWall(map, layer, row, col)
-      && !(row === playerRow && col === playerCol)) {
+// Resolves stalker to nearest non-wall tile in the new layer.
+// Unlike before, we NO LONGER skip the player tile — if the nearest open tile
+// is the player's tile, the stalker lands there and collision = death.
+// The old "skip player tile" logic was hiding the bug: stalker next to you
+// would resolve to a far tile instead of catching you.
+const resolveStalkerPosition = (map, layer, row, col) => {
+  // Already on a valid floor tile — stay there
+  if (isNotWall(map, layer, row, col)) {
     return { row, col };
   }
 
+  // On a wall in the new layer — BFS outward to nearest open tile
   const visited = new Set([`${row},${col}`]);
   let frontier = [[row, col]];
 
@@ -152,10 +156,9 @@ const resolveStalkerPosition = (map, layer, row, col, playerRow, playerCol) => {
         if (visited.has(key) || !isInBounds(nextRow, nextCol)) continue;
         visited.add(key);
 
-        // Skip the player's tile — stalker must not resolve onto the player
-        if (nextRow === playerRow && nextCol === playerCol) continue;
-
         if (isNotWall(map, layer, nextRow, nextCol)) {
+          // Found the nearest open tile — even if it's the player's tile
+          // checkStalkerCollision will handle the death
           return { row: nextRow, col: nextCol };
         }
 
@@ -166,6 +169,7 @@ const resolveStalkerPosition = (map, layer, row, col, playerRow, playerCol) => {
     frontier = nextFrontier;
   }
 
+  // Absolute fallback — maze is fully connected so this shouldn't happen
   return { row, col };
 };
 
@@ -410,7 +414,6 @@ const createPlayingState = () => {
   const stalker = resolveStalkerPosition(
     map, 0,
     stalkerStart.row, stalkerStart.col,
-    PLAYER_START.row, PLAYER_START.col,
   );
 
   return updateSeen({
@@ -478,19 +481,18 @@ const shiftDimension = (gameState) => {
     // Stalker was in the other dimension — it re-enters current play layer
     newStalkerLocked = false;
     resolvedStalker = resolveStalkerPosition(
-      map, nextLayer, stalker.row, stalker.col, player.row, player.col,
+      map, nextLayer, stalker.row, stalker.col,
     );
   } else if (config.stalkerMovesOnShift && Math.random() < 0.30) {
     // Dimension memory: stalker stays in the old layer — player escapes alone
     newStalkerLocked = true;
-    // Stalker keeps its current position (it's now in the "other" dimension)
     resolvedStalker = { ...stalker };
     if (typeof onStalkerMemory === 'function') onStalkerMemory();
   } else {
     // Normal shift — stalker follows
     newStalkerLocked = false;
     resolvedStalker = resolveStalkerPosition(
-      map, nextLayer, stalker.row, stalker.col, player.row, player.col,
+      map, nextLayer, stalker.row, stalker.col,
     );
   }
 
@@ -504,6 +506,7 @@ const shiftDimension = (gameState) => {
   newState = updateSeen(newState);
   applyDimensionTheme(nextLayer);
 
+  // Check collision IMMEDIATELY after resolving — stalker may have landed on player
   newState = checkStalkerCollision(newState);
   if (newState.gameStatus !== 'playing') return newState;
 
