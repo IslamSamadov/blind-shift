@@ -891,7 +891,7 @@ const getLightBrightness = (row, col, playerRow, playerCol, lightRadius) => {
   const dy = row - playerRow;
   const dist = Math.sqrt(dx * dx + dy * dy);
   if (dist > lightRadius) return 0;
-  return Math.max(0, 1 - (dist / lightRadius) ** 1.6);
+  return Math.max(0, 1 - (dist / lightRadius) ** 1.1); // gentler falloff = brighter overall
 };
 
 const renderTile = (row, col, tile, brightness, explored, layer) => {
@@ -910,7 +910,7 @@ const renderTile = (row, col, tile, brightness, explored, layer) => {
     ctx.fillStyle = fillColor;
     ctx.fillRect(x, y, TILE, TILE);
     if (brightness < 1) {
-      ctx.fillStyle = `rgba(0,0,0,${(1 - brightness) * 0.72})`;
+      ctx.fillStyle = `rgba(0,0,0,${(1 - brightness) * 0.45})`;
       ctx.fillRect(x, y, TILE, TILE);
     }
     ctx.strokeStyle = layer === 0 ? 'rgba(26,10,10,0.4)' : 'rgba(10,10,26,0.4)';
@@ -923,7 +923,7 @@ const renderTile = (row, col, tile, brightness, explored, layer) => {
 };
 
 // ── Particle trail ────────────────────────────────────────────────────────────
-const MAX_TRAIL = 18;
+const MAX_TRAIL = 2;
 const playerTrail = []; // array of {row, col, age} — age 0=newest
 
 const addTrailPoint = (row, col) => {
@@ -944,7 +944,7 @@ const renderTrail = (playerRow, playerCol, currentLayer, lightRadius) => {
     const r = TILE / 9;
     ctx.save();
     ctx.globalAlpha = alpha;
-    ctx.fillStyle = currentLayer === 0 ? '#ff6644' : '#4488ff';
+    ctx.fillStyle = currentLayer === 0 ? '#f5d76e' : '#4488ff';
     ctx.beginPath();
     ctx.arc(x, y, r, 0, Math.PI * 2);
     ctx.fill();
