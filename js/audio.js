@@ -47,50 +47,43 @@ const fireThud = (gainNode, freq, decay = 0.14) => {
 };
 
 // ─── LAYER 0 — RED DIMENSION ─────────────────────────────────────────────────
-// Vibe: dark cathedral. Slow cello-like melody in A minor, deep brass stabs,
-// a low rumbling pulse, and a smoldering string pad underneath.
-// More musical than the blue layer but darker and heavier — like walking
-// through a burning church. You feel dread, not panic.
 
 const buildRedLayer = () => {
   const master = audioContext.createGain();
   master.gain.setValueAtTime(0, audioContext.currentTime);
-  master.gain.linearRampToValueAtTime(0.35, audioContext.currentTime + 2.5);
+  master.gain.linearRampToValueAtTime(0.18, audioContext.currentTime + 2.5); // lowered from 0.35
   master.connect(audioContext.destination);
 
   const sources = [];
   let stopFlag = false;
   const onStop = (fn) => { sources.push({ stop: fn }); };
 
-  // 1. CELLO MELODY — sawtooth through a warm lowpass, slow Am melody
-  // Sawtooth → lowpass ≈ a bowed string instrument
+  // 1. CELLO MELODY
   const celloGain = audioContext.createGain();
   const celloFilter = audioContext.createBiquadFilter();
   celloFilter.type = 'lowpass';
   celloFilter.frequency.value = 900;
   celloFilter.Q.value = 1.2;
-  celloGain.gain.value = 1.2;
+  celloGain.gain.value = 0.7; // lowered from 1.2
   celloGain.connect(celloFilter);
   celloFilter.connect(master);
 
-  // Am descending melody — darker mirror of the blue Dm melody
   const celloMelody = [
-    { freq: 220.00, dur: 2.2 },  // A3
-    { freq: 196.00, dur: 1.6 },  // G3
-    { freq: 174.61, dur: 1.4 },  // F3
-    { freq: 164.81, dur: 2.8 },  // E3 (held — ominous)
-    { freq: 0,      dur: 0.8 },  // rest
-    { freq: 155.56, dur: 1.8 },  // Eb3 (dark)
-    { freq: 164.81, dur: 1.2 },  // E3
-    { freq: 174.61, dur: 1.6 },  // F3
-    { freq: 196.00, dur: 3.5 },  // G3 (long)
-    { freq: 0,      dur: 1.2 },  // rest
-    // phrase B — lower, heavier
-    { freq: 146.83, dur: 1.8 },  // D3
-    { freq: 130.81, dur: 1.4 },  // C3
-    { freq: 116.54, dur: 2.0 },  // Bb2
-    { freq: 110.00, dur: 4.0 },  // A2 (tonic, long resolve)
-    { freq: 0,      dur: 2.5 },  // long rest before repeat
+    { freq: 220.00, dur: 2.2 },
+    { freq: 196.00, dur: 1.6 },
+    { freq: 174.61, dur: 1.4 },
+    { freq: 164.81, dur: 2.8 },
+    { freq: 0,      dur: 0.8 },
+    { freq: 155.56, dur: 1.8 },
+    { freq: 164.81, dur: 1.2 },
+    { freq: 174.61, dur: 1.6 },
+    { freq: 196.00, dur: 3.5 },
+    { freq: 0,      dur: 1.2 },
+    { freq: 146.83, dur: 1.8 },
+    { freq: 130.81, dur: 1.4 },
+    { freq: 116.54, dur: 2.0 },
+    { freq: 110.00, dur: 4.0 },
+    { freq: 0,      dur: 2.5 },
   ];
 
   const playCelloNote = (freq, dur) => {
@@ -103,13 +96,12 @@ const buildRedLayer = () => {
     osc.type = 'sawtooth';
     osc.frequency.value = freq;
     osc2.type = 'sawtooth';
-    osc2.frequency.value = freq * 1.005; // slight detune for warmth
+    osc2.frequency.value = freq * 1.005;
     g2.gain.value = 0.4;
-    // Bow attack: slow attack, sustained, slow release — like drawing a bow
     g.gain.setValueAtTime(0, now);
-    g.gain.linearRampToValueAtTime(0.5, now + 0.35);   // slow bow attack
-    g.gain.linearRampToValueAtTime(0.38, now + 0.8);   // settle
-    g.gain.exponentialRampToValueAtTime(0.001, now + dur + 0.6); // slow release
+    g.gain.linearRampToValueAtTime(0.5, now + 0.35);
+    g.gain.linearRampToValueAtTime(0.38, now + 0.8);
+    g.gain.exponentialRampToValueAtTime(0.001, now + dur + 0.6);
     osc.connect(g);
     osc2.connect(g2);
     g.connect(celloGain);
@@ -134,7 +126,7 @@ const buildRedLayer = () => {
   };
   setTimeout(celloNote, 1500);
 
-  // 2. BASS CELLO — same pattern an octave down, enters later
+  // 2. BASS CELLO
   const bassCelloGain = audioContext.createGain();
   const bassCelloFilter = audioContext.createBiquadFilter();
   bassCelloFilter.type = 'lowpass';
@@ -144,13 +136,13 @@ const buildRedLayer = () => {
   bassCelloFilter.connect(master);
 
   const bassLine = [
-    { freq: 55.00,  dur: 4.0 },  // A1
+    { freq: 55.00,  dur: 4.0 },
     { freq: 0,      dur: 1.5 },
-    { freq: 49.00,  dur: 3.5 },  // G1
+    { freq: 49.00,  dur: 3.5 },
     { freq: 0,      dur: 2.0 },
-    { freq: 43.65,  dur: 4.5 },  // F1
+    { freq: 43.65,  dur: 4.5 },
     { freq: 0,      dur: 2.5 },
-    { freq: 41.20,  dur: 6.0 },  // E1
+    { freq: 41.20,  dur: 6.0 },
     { freq: 0,      dur: 3.0 },
   ];
 
@@ -162,21 +154,19 @@ const buildRedLayer = () => {
     if (bassStopped || !audioContext) return;
     const note = bassLine[bassIndex % bassLine.length];
     bassIndex += 1;
-    if (note.freq > 0) playCelloNote(note.freq, note.dur); // reuse same synth, lower freq
+    if (note.freq > 0) playCelloNote(note.freq, note.dur);
     setTimeout(bassNote, note.dur * 1000);
   };
-  // Bass enters a few seconds in so cello establishes first
-  const bassCelloProxy = { gain: bassCelloGain };
   setTimeout(bassNote, 5000);
 
-  // 3. BRASS STABS — slow deep horn hits every 6–12s, like a war signal
+  // 3. BRASS STABS
   let brassStopped = false;
   onStop(() => { brassStopped = true; });
 
   const brassStab = () => {
     if (brassStopped || !audioContext) return;
     const now = audioContext.currentTime;
-    const freq = [87.31, 73.42, 82.41][Math.floor(Math.random() * 3)]; // Bb1, D1, E1
+    const freq = [87.31, 73.42, 82.41][Math.floor(Math.random() * 3)];
     const osc = audioContext.createOscillator();
     const osc2 = audioContext.createOscillator();
     const g = audioContext.createGain();
@@ -188,8 +178,8 @@ const buildRedLayer = () => {
     f.type = 'lowpass';
     f.frequency.value = 600;
     g.gain.setValueAtTime(0, now);
-    g.gain.linearRampToValueAtTime(0.22, now + 0.12); // punchy attack
-    g.gain.exponentialRampToValueAtTime(0.08, now + 1.2);
+    g.gain.linearRampToValueAtTime(0.12, now + 0.12); // lowered from 0.22
+    g.gain.exponentialRampToValueAtTime(0.04, now + 1.2);
     g.gain.exponentialRampToValueAtTime(0.001, now + 3.5);
     osc.connect(f);
     osc2.connect(f);
@@ -203,8 +193,7 @@ const buildRedLayer = () => {
   };
   setTimeout(brassStab, 4000);
 
-  // 4. SMOLDERING PAD — two detuned triangle waves very quietly underneath
-  // Gives warmth and keeps silence from feeling empty between cello notes
+  // 4. SMOLDERING PAD
   const padGain = audioContext.createGain();
   const padFilter = audioContext.createBiquadFilter();
   padFilter.type = 'lowpass';
@@ -230,7 +219,7 @@ const buildRedLayer = () => {
     sources.push(osc, lfo);
   });
 
-  // 5. LOW RUMBLE — sub-bass texture, like a distant fire or machinery
+  // 5. LOW RUMBLE
   const rumbleNoise = createLoopingNoiseNode();
   const rumbleFilter = audioContext.createBiquadFilter();
   const rumbleGain = audioContext.createGain();
@@ -243,9 +232,9 @@ const buildRedLayer = () => {
   rumbleNoise.start();
   sources.push(rumbleNoise);
 
-  // 6. SLOW HEARTBEAT — one single thump every ~2s, not frantic, just inevitable
+  // 6. SLOW HEARTBEAT
   const hbGain = audioContext.createGain();
-  hbGain.gain.value = 0.3;
+  hbGain.gain.value = 0.15; // lowered from 0.3
   hbGain.connect(master);
   let hbStopped = false;
   onStop(() => { hbStopped = true; });
@@ -255,29 +244,25 @@ const buildRedLayer = () => {
     fireThud(hbGain, 52, 0.2);
     setTimeout(heartbeat, 1800 + Math.random() * 400);
   };
-  setTimeout(heartbeat, 3000); // enters late, after you've settled in
+  setTimeout(heartbeat, 3000);
 
   return { master, sources, _setStop: () => { stopFlag = true; } };
 };
 
 
 // ─── LAYER 1 — BLUE DIMENSION ────────────────────────────────────────────────
-// Vibe: ghostly void. Zero percussion — completely different feel from red.
-// Eerie detuned choir pads, slow crystalline arpeggios, cold wind, distant
-// whale-like moans, and random reversed-whoosh swells. Feels like floating
-// in empty space while something watches you from every direction.
 
 const buildBlueLayer = () => {
   const master = audioContext.createGain();
   master.gain.setValueAtTime(0, audioContext.currentTime);
-  master.gain.linearRampToValueAtTime(0.35, audioContext.currentTime + 3.0); // slower fade in
+  master.gain.linearRampToValueAtTime(0.18, audioContext.currentTime + 3.0); // lowered from 0.35
   master.connect(audioContext.destination);
 
   const sources = [];
   let stopFlag = false;
   const onStop = (fn) => { sources.push({ stop: fn }); };
 
-  // 1. GHOST CHOIR — four sine voices in a haunted minor cluster, each slowly drifting
+  // 1. GHOST CHOIR
   const choirGain = audioContext.createGain();
   choirGain.gain.value = 0.055;
   choirGain.connect(master);
@@ -291,8 +276,8 @@ const buildBlueLayer = () => {
     osc.type = 'sine';
     osc.frequency.value = freq;
     lfo.type = 'sine';
-    lfo.frequency.value = 0.05 + i * 0.02; // each voice drifts at its own pace
-    lfoGain.gain.value = 1.8;               // very subtle vibrato
+    lfo.frequency.value = 0.05 + i * 0.02;
+    lfoGain.gain.value = 1.8;
     oscGain.gain.value = 0.25;
 
     lfo.connect(lfoGain);
@@ -304,7 +289,6 @@ const buildBlueLayer = () => {
     sources.push(osc, lfo);
   });
 
-  // Slowly pulse the choir volume — like it's breathing
   let choirStopped = false;
   onStop(() => { choirStopped = true; });
   const choirBreath = () => {
@@ -317,8 +301,8 @@ const buildBlueLayer = () => {
   };
   setTimeout(choirBreath, 2000);
 
-  // 2. CRYSTALLINE ARPEGGIO — slow descending minor arpeggio, like music from another world
-  const arpFreqs = [523.2, 466.2, 440, 392, 349.2, 329.6]; // descending Dm scale
+  // 2. CRYSTALLINE ARPEGGIO
+  const arpFreqs = [523.2, 466.2, 440, 392, 349.2, 329.6];
   let arpIndex = 0;
   let arpStopped = false;
   onStop(() => { arpStopped = true; });
@@ -342,7 +326,7 @@ const buildBlueLayer = () => {
   };
   setTimeout(arpNote, 1500);
 
-  // 3. WHALE MOAN — long slow rising/falling sine, like something enormous far away
+  // 3. WHALE MOAN
   let whaleStopped = false;
   onStop(() => { whaleStopped = true; });
 
@@ -371,7 +355,7 @@ const buildBlueLayer = () => {
   };
   setTimeout(whaleMoan, 3000);
 
-  // 4. COLD WIND — bandpass noise swept slowly, completely different texture from red's scrape
+  // 4. COLD WIND
   const windNoise = createLoopingNoiseNode();
   const windFilter = audioContext.createBiquadFilter();
   const windLfo = audioContext.createOscillator();
@@ -381,7 +365,7 @@ const buildBlueLayer = () => {
   windFilter.frequency.value = 800;
   windFilter.Q.value = 0.6;
   windLfo.type = 'sine';
-  windLfo.frequency.value = 0.08; // very slow sweep
+  windLfo.frequency.value = 0.08;
   windLfoGain.gain.value = 600;
   windLfo.connect(windLfoGain);
   windLfoGain.connect(windFilter.frequency);
@@ -393,7 +377,7 @@ const buildBlueLayer = () => {
   windLfo.start();
   sources.push(windNoise, windLfo);
 
-  // 5. REVERSE WHOOSH — noise swell that fades IN then cuts, like something rushing at you
+  // 5. REVERSE WHOOSH
   let whooshStopped = false;
   onStop(() => { whooshStopped = true; });
 
@@ -407,10 +391,9 @@ const buildBlueLayer = () => {
     f.type = 'bandpass';
     f.frequency.value = 400 + Math.random() * 300;
     f.Q.value = 1.5;
-    // reverse envelope: fade IN (the scary part) then instant cut
     g.gain.setValueAtTime(0.0, now);
-    g.gain.linearRampToValueAtTime(0.07, now + 1.4);  // build up
-    g.gain.setValueAtTime(0.0, now + 1.45);            // hard cut
+    g.gain.linearRampToValueAtTime(0.07, now + 1.4);
+    g.gain.setValueAtTime(0.0, now + 1.45);
     noise.connect(f);
     f.connect(g);
     g.connect(master);
@@ -419,59 +402,51 @@ const buildBlueLayer = () => {
   };
   setTimeout(reverseWhoosh, 4000);
 
-  // 6. HAUNTING PIANO — full two-phrase melody in D minor with left-hand bass
-  // Triangle + sine layered for a warm muted-piano tone
+  // 6. HAUNTING PIANO
   const pianoGain = audioContext.createGain();
   const pianoFilter = audioContext.createBiquadFilter();
   pianoFilter.type = 'lowpass';
   pianoFilter.frequency.value = 2200;
   pianoFilter.Q.value = 0.4;
-  pianoGain.gain.value = 1.4;  // piano is the star — pushed up
+  pianoGain.gain.value = 0.8; // lowered from 1.4
   pianoGain.connect(pianoFilter);
   pianoFilter.connect(master);
 
-  // Full melody: two 8-bar phrases that tell a story, then a long rest before repeat
-  // Phrase A — searching, descending
-  // Phrase B — resolving, a little hopeful, then falling again
   const pianoMelody = [
-    // ── Phrase A ──────────────────────────────────────────
-    { freq: 293.66, dur: 1.6 },  // D4
-    { freq: 261.63, dur: 1.2 },  // C4
-    { freq: 246.94, dur: 0.9 },  // B3
-    { freq: 220.00, dur: 2.4 },  // A3 (breathe)
-    { freq: 0,      dur: 0.6 },  // rest
-    { freq: 196.00, dur: 1.0 },  // G3
-    { freq: 174.61, dur: 1.4 },  // F3
-    { freq: 196.00, dur: 0.8 },  // G3
-    { freq: 220.00, dur: 3.2 },  // A3 (long hold)
-    { freq: 0,      dur: 1.0 },  // rest
-
-    // ── Phrase B ──────────────────────────────────────────
-    { freq: 261.63, dur: 1.2 },  // C4
-    { freq: 293.66, dur: 1.0 },  // D4
-    { freq: 329.63, dur: 1.6 },  // E4 (rise — moment of hope)
-    { freq: 311.13, dur: 0.8 },  // Eb4 (bittersweet)
-    { freq: 293.66, dur: 2.0 },  // D4
-    { freq: 0,      dur: 0.5 },  // rest
-    { freq: 261.63, dur: 1.0 },  // C4
-    { freq: 246.94, dur: 1.2 },  // B3
-    { freq: 220.00, dur: 1.4 },  // A3
-    { freq: 196.00, dur: 1.0 },  // G3
-    { freq: 174.61, dur: 4.5 },  // F3 (long, fading out)
-    { freq: 0,      dur: 3.5 },  // long silence before repeat
+    { freq: 293.66, dur: 1.6 },
+    { freq: 261.63, dur: 1.2 },
+    { freq: 246.94, dur: 0.9 },
+    { freq: 220.00, dur: 2.4 },
+    { freq: 0,      dur: 0.6 },
+    { freq: 196.00, dur: 1.0 },
+    { freq: 174.61, dur: 1.4 },
+    { freq: 196.00, dur: 0.8 },
+    { freq: 220.00, dur: 3.2 },
+    { freq: 0,      dur: 1.0 },
+    { freq: 261.63, dur: 1.2 },
+    { freq: 293.66, dur: 1.0 },
+    { freq: 329.63, dur: 1.6 },
+    { freq: 311.13, dur: 0.8 },
+    { freq: 293.66, dur: 2.0 },
+    { freq: 0,      dur: 0.5 },
+    { freq: 261.63, dur: 1.0 },
+    { freq: 246.94, dur: 1.2 },
+    { freq: 220.00, dur: 1.4 },
+    { freq: 196.00, dur: 1.0 },
+    { freq: 174.61, dur: 4.5 },
+    { freq: 0,      dur: 3.5 },
   ];
 
-  // Left-hand bass — sparse low octave notes, plays on held notes only
   const bassNotes = [
-    { freq: 73.42,  dur: 3.0 },  // D2
+    { freq: 73.42,  dur: 3.0 },
     { freq: 0,      dur: 1.8 },
-    { freq: 65.41,  dur: 3.2 },  // C2
+    { freq: 65.41,  dur: 3.2 },
     { freq: 0,      dur: 2.5 },
-    { freq: 55.00,  dur: 4.0 },  // A2
+    { freq: 55.00,  dur: 4.0 },
     { freq: 0,      dur: 2.0 },
-    { freq: 49.00,  dur: 3.5 },  // G2
+    { freq: 49.00,  dur: 3.5 },
     { freq: 0,      dur: 3.0 },
-    { freq: 43.65,  dur: 5.0 },  // F2
+    { freq: 43.65,  dur: 5.0 },
     { freq: 0,      dur: 4.0 },
   ];
 
@@ -514,7 +489,6 @@ const buildBlueLayer = () => {
     setTimeout(pianoNote, noteDur * 1000);
   };
 
-  // Bass runs independently, loops through its own pattern
   let bassIndex = 0;
   let bassStopped = false;
   onStop(() => { bassStopped = true; });
@@ -527,23 +501,22 @@ const buildBlueLayer = () => {
     setTimeout(bassNote, note.dur * 1000);
   };
 
-  // Piano enters first, bass joins a few seconds later
   setTimeout(pianoNote, 3000 + Math.random() * 1500);
   setTimeout(bassNote, 6000 + Math.random() * 2000);
 
-  // 7. HIGH GLASS TONE — single sustained very high sine, barely audible, deeply unsettling
+  // 7. HIGH GLASS TONE
   const glassTone = audioContext.createOscillator();
   const glassGain = audioContext.createGain();
   const glassLfo = audioContext.createOscillator();
   const glassLfoGain = audioContext.createGain();
   glassTone.type = 'sine';
-  glassTone.frequency.value = 440; // lowered from 2800 — warm A4 instead of painful high ring
+  glassTone.frequency.value = 440;
   glassLfo.type = 'sine';
   glassLfo.frequency.value = 0.03;
   glassLfoGain.gain.value = 0.008;
   glassLfo.connect(glassLfoGain);
   glassLfoGain.connect(glassGain.gain);
-  glassGain.gain.value = 0.006; // quieter too
+  glassGain.gain.value = 0.006;
   glassTone.connect(glassGain);
   glassGain.connect(master);
   glassTone.start();
@@ -618,7 +591,7 @@ const shiftSoundtrackTheme = (layer) => {
 // ─── MUTE ────────────────────────────────────────────────────────────────────
 
 let isMuted = false;
-let muteGainNode = null; // master mute node connected to destination
+let muteGainNode = null;
 
 const ensureMuteNode = () => {
   if (!audioContext || muteGainNode) return;
@@ -627,7 +600,6 @@ const ensureMuteNode = () => {
   muteGainNode.connect(audioContext.destination);
 };
 
-// Re-route soundtrack master through the mute node
 const rewireToMuteNode = (nodes) => {
   if (!nodes || !muteGainNode) return;
   try {
@@ -641,7 +613,6 @@ const setMute = (muted) => {
   if (muteGainNode) {
     muteGainNode.gain.setTargetAtTime(muted ? 0 : 1, audioContext.currentTime, 0.05);
   }
-  // update button label if it exists
   const btn = document.getElementById('mute-btn');
   if (btn) btn.textContent = muted ? '🔇' : '🔊';
 };
@@ -650,18 +621,17 @@ const toggleMute = () => setMute(!isMuted);
 
 // ─── PROXIMITY & LUNGE AUDIO ──────────────────────────────────────────────────
 
-// Separate gain node for the proximity heartbeat so it can scale independently
 let proximityBeatNode = null;
 let proximityBeatStopped = false;
 let proximityBeatInterval = null;
-let currentProximityBpm = 60; // slow baseline
+let currentProximityBpm = 60;
 
 const PROXIMITY_THRESHOLDS = [
-  { dist: 2,  bpm: 160, gain: 0.55 }, // RIGHT there
+  { dist: 2,  bpm: 160, gain: 0.55 },
   { dist: 4,  bpm: 120, gain: 0.38 },
   { dist: 6,  bpm: 90,  gain: 0.22 },
   { dist: 10, bpm: 68,  gain: 0.10 },
-  { dist: 999,bpm: 0,   gain: 0    }, // far away — silent
+  { dist: 999,bpm: 0,   gain: 0    },
 ];
 
 const stopProximityBeat = () => {
@@ -679,7 +649,6 @@ const startProximityBeat = (bpm, gainVal) => {
     const now = audioContext.currentTime;
     const dest = muteGainNode || audioContext.destination;
 
-    // Double-thump heartbeat
     const fire = (freq, delay, vol) => {
       setTimeout(() => {
         if (proximityBeatStopped || !audioContext) return;
@@ -699,7 +668,7 @@ const startProximityBeat = (bpm, gainVal) => {
     };
 
     fire(65, 0, gainVal);
-    fire(55, 160, gainVal * 0.7); // second weaker thump
+    fire(55, 160, gainVal * 0.7);
 
     const intervalMs = (60 / currentProximityBpm) * 1000;
     proximityBeatInterval = setTimeout(beat, intervalMs);
@@ -708,7 +677,6 @@ const startProximityBeat = (bpm, gainVal) => {
   beat();
 };
 
-// Called by app.js every stalker turn with Manhattan distance
 const setStalkerProximity = (distance) => {
   if (!audioContext) return;
 
@@ -718,21 +686,18 @@ const setStalkerProximity = (distance) => {
     return;
   }
 
-  // If BPM changed significantly, restart the beat loop at new speed
   if (Math.abs(tier.bpm - currentProximityBpm) > 5 || proximityBeatStopped) {
     stopProximityBeat();
     startProximityBeat(tier.bpm, tier.gain);
   }
 };
 
-// Called by app.js when a lunge fires — jarring low boom + high screech
 const onStalkerLunge = () => {
   initAudio().then(() => {
     if (!audioContext) return;
     const now = audioContext.currentTime;
     const dest = muteGainNode || audioContext.destination;
 
-    // Sub boom
     const boom = audioContext.createOscillator();
     const boomG = audioContext.createGain();
     boom.type = 'sine';
@@ -745,7 +710,6 @@ const onStalkerLunge = () => {
     boom.start(now);
     boom.stop(now + 0.55);
 
-    // Short screech layer
     const screech = audioContext.createOscillator();
     const screechG = audioContext.createGain();
     screech.type = 'sawtooth';
@@ -760,14 +724,12 @@ const onStalkerLunge = () => {
   });
 };
 
-// Called by app.js when dimension memory triggers — eerie tone shift
 const onStalkerMemory = () => {
   initAudio().then(() => {
     if (!audioContext) return;
     const now = audioContext.currentTime;
     const dest = muteGainNode || audioContext.destination;
 
-    // Rising ethereal tone — "it stayed behind"
     const o = audioContext.createOscillator();
     const g = audioContext.createGain();
     const f = audioContext.createBiquadFilter();
