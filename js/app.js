@@ -23,8 +23,9 @@ const DIFFICULTY = {
 };
 
 const PLAYER_START = { row: 1, col: 1 };
-const STALKER_START = { row: 9, col: 13 };
 const EXIT_DOOR = { row: 1, col: 13 };
+
+const MIN_STALKER_DIST = 8; // minimum Manhattan distance from player start
 
 const MIN_CUBES_PER_LAYER = 2;
 const MAX_CUBES_PER_LAYER = 3;
@@ -214,7 +215,7 @@ const countCubes = (map) => {
 
 const getReservedTiles = () => {
   const reserved = new Set();
-  [PLAYER_START, STALKER_START, EXIT_DOOR].forEach(({ row, col }) => {
+  [PLAYER_START, EXIT_DOOR].forEach(({ row, col }) => {
     reserved.add(`${row},${col}`);
   });
   return reserved;
@@ -322,8 +323,6 @@ const ensurePath = (layer, start, end) => {
 const stampRequiredTiles = (layer) => {
   carveFloor(layer, PLAYER_START.row, PLAYER_START.col);
   layer[PLAYER_START.row][PLAYER_START.col] = FLOOR;
-  carveFloor(layer, STALKER_START.row, STALKER_START.col);
-  layer[STALKER_START.row][STALKER_START.col] = FLOOR;
   layer[EXIT_DOOR.row][EXIT_DOOR.col] = DOOR;
 };
 
@@ -366,7 +365,6 @@ const generateMazeLayer = () => {
 
   stampRequiredTiles(layer);
   ensurePath(layer, PLAYER_START, EXIT_DOOR);
-  ensurePath(layer, STALKER_START, EXIT_DOOR);
 
   return layer;
 };
@@ -376,6 +374,30 @@ const createRandomMap = () => [
   generateMazeLayer(),
 ];
 
+const pickStalkerStart = (map) => {
+  const candidates = [];
+
+  for (let row = 0; row < ROWS; row += 1) {
+    for (let col = 0; col < COLS; col += 1) {
+      if (map[0][row][col] === WALL) continue;
+      if (map[0][row][col] === DOOR) continue;
+      const dist = Math.abs(row - PLAYER_START.row) + Math.abs(col - PLAYER_START.col);
+      if (dist < MIN_STALKER_DIST) continue;
+      // also keep away from exit door
+      const exitDist = Math.abs(row - EXIT_DOOR.row) + Math.abs(col - EXIT_DOOR.col);
+      if (exitDist < 3) continue;
+      candidates.push({ row, col });
+    }
+  }
+
+  if (candidates.length === 0) {
+    // Fallback if maze is too small (shouldn't happen)
+    return { row: ROWS - 2, col: COLS - 2 };
+  }
+
+  return candidates[Math.floor(Math.random() * candidates.length)];
+};
+
 const createPlayingState = () => {
   const map = placeRandomCubes(createRandomMap());
   const seen = createEmptySeen(map.length);
@@ -384,10 +406,10 @@ const createPlayingState = () => {
     throw new Error('Player spawn is blocked by a wall.');
   }
 
-  // FIX 2: pass player position so stalker cannot resolve onto the player tile
+  const stalkerStart = pickStalkerStart(map);
   const stalker = resolveStalkerPosition(
     map, 0,
-    STALKER_START.row, STALKER_START.col,
+    stalkerStart.row, stalkerStart.col,
     PLAYER_START.row, PLAYER_START.col,
   );
 
@@ -1143,4 +1165,4 @@ document.getElementById('mobile-shift-btn').addEventListener('click', () => hand
 
 updateHighScoreDisplay();
 updateHint();
-gameLoop(); 
+gameLoop();
