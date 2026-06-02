@@ -293,6 +293,124 @@ body.blue-dimension .screen {
 .screen-btn-hard:hover {
   background: #4a2020;
 }
+.screen-btn-how {
+  font-size: 0.82rem;
+  padding: 0.45rem 1rem;
+  border-color: rgba(180,180,180,0.25);
+  background: transparent;
+  opacity: 0.75;
+}
+.screen-btn-how:hover {
+  background: rgba(255,255,255,0.06);
+  opacity: 1;
+}
+
+/* ── HOW TO PLAY MODAL ───────────────────────────────────────────────────── */
+
+.modal {
+  position: absolute;
+  inset: 0;
+  z-index: 25;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.78);
+  backdrop-filter: blur(3px);
+}
+.modal.hidden { display: none; }
+
+.modal-inner {
+  width: 92%;
+  max-height: 88%;
+  overflow-y: auto;
+  background: #120808;
+  border: 1px solid #5c2020;
+  padding: 1.2rem 1.3rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  text-align: left;
+  scrollbar-width: thin;
+  scrollbar-color: #5c2020 transparent;
+}
+body.blue-dimension .modal-inner {
+  background: #080812;
+  border-color: #20205c;
+}
+
+.modal-title {
+  font-size: 1.15rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align: center;
+  margin-bottom: 0.2rem;
+}
+
+.modal-section h4 {
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.6;
+  margin-bottom: 0.3rem;
+}
+.modal-section p,
+.modal-section ul {
+  font-size: 0.88rem;
+  line-height: 1.55;
+  opacity: 0.88;
+}
+
+.modal-controls {
+  display: grid;
+  grid-template-columns: auto auto auto 1fr;
+  align-items: center;
+  gap: 0.3rem 0.55rem;
+  font-size: 0.85rem;
+}
+
+.kbd {
+  display: inline-block;
+  padding: 0.15rem 0.45rem;
+  border: 1px solid rgba(255,255,255,0.22);
+  border-radius: 4px;
+  background: rgba(255,255,255,0.06);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.modal-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.modal-list li {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+}
+
+/* Color helpers */
+.clr-red    { color: #ff5555; }
+.clr-blue   { color: #7ec8ff; }
+.clr-green  { color: #6bdc6b; }
+.clr-yellow { color: #f5d76e; }
+
+.modal-close {
+  align-self: center;
+  margin-top: 0.3rem;
+  min-width: 7rem;
+}
+
+/* Responsive modal */
+@media (max-width: 520px) {
+  .modal-inner { padding: 1rem; gap: 0.7rem; }
+  .modal-title { font-size: 1rem; }
+  .modal-section p,
+  .modal-section ul { font-size: 0.82rem; }
+  .modal-controls { font-size: 0.78rem; gap: 0.25rem 0.4rem; }
+}
 body.blue-dimension .screen-btn {
   border-color: #20205c;
   background: #12182a;

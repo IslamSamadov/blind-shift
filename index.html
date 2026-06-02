@@ -38,7 +38,55 @@
           <button id="easy-btn" class="screen-btn screen-btn-easy" type="button">Easy</button>
           <button id="hard-btn" class="screen-btn screen-btn-hard" type="button">Hard</button>
         </div>
+        <button id="how-to-play-btn" class="screen-btn screen-btn-how" type="button">? How to Play</button>
         <p class="screen-hint">Easy: safe shifts · Hard: stalker reacts to shifts &amp; cubes · 1 / 2 keys</p>
+      </div>
+
+      <!-- How to Play modal -->
+      <div id="how-to-play-modal" class="modal hidden" role="dialog" aria-modal="true" aria-label="How to Play">
+        <div class="modal-inner">
+          <h3 class="modal-title">How to Play</h3>
+
+          <div class="modal-section">
+            <h4>🎯 Objective</h4>
+            <p>Collect every <span class="clr-blue">Quantum Cube</span> hidden across both dimensions, then reach the <span class="clr-green">Exit Door</span> before the Stalker catches you.</p>
+          </div>
+
+          <div class="modal-section">
+            <h4>🕹️ Controls</h4>
+            <div class="modal-controls">
+              <span class="kbd">W A S D</span><span>or</span><span class="kbd">↑ ← ↓ →</span><span>Move</span>
+              <span class="kbd">SPACE</span><span></span><span></span><span>Phase Shift</span>
+            </div>
+          </div>
+
+          <div class="modal-section">
+            <h4>🌀 Dimensions</h4>
+            <p>Press <span class="kbd">SPACE</span> to flip between the <span class="clr-red">Red</span> and <span class="clr-blue">Blue</span> dimension. Each has its own walls and cubes. The Stalker follows you — but sometimes it stays behind.</p>
+          </div>
+
+          <div class="modal-section">
+            <h4>👁️ Entities</h4>
+            <ul class="modal-list">
+              <li><span class="clr-yellow">●</span> <strong>You</strong> — navigate the darkness</li>
+              <li><span class="clr-red">● ●</span> <strong>Stalker</strong> — hunts you. Cannot be killed</li>
+              <li><span class="clr-blue">■</span> <strong>Quantum Cube</strong> — collect all to unlock exit</li>
+              <li><span class="clr-green">▮</span> <strong>Exit Door</strong> — escape when all cubes collected</li>
+            </ul>
+          </div>
+
+          <div class="modal-section">
+            <h4>💡 Survival Tips</h4>
+            <ul class="modal-list">
+              <li>Lure the Stalker into open space in one dimension, then shift — a wall may trap it on the other side.</li>
+              <li>Watch for <span class="clr-red">red eyes</span> glowing in the dark — the Stalker is close.</li>
+              <li>The Stalker occasionally <strong>lunges</strong> — never stand still.</li>
+              <li>Your flashlight may <strong>flicker</strong> — keep moving.</li>
+            </ul>
+          </div>
+
+          <button id="modal-close-btn" class="screen-btn modal-close" type="button">Got it</button>
+        </div>
       </div>
 
       <div id="game-over-screen" class="screen hidden">

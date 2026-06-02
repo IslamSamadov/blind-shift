@@ -1145,6 +1145,27 @@ easyBtn.addEventListener('click', () => startGame('easy'));
 hardBtn.addEventListener('click', () => startGame('hard'));
 restartBtn.addEventListener('click', restartGame);
 
+// ── How to Play modal ─────────────────────────────────────────────────────────
+const howToPlayModal = document.getElementById('how-to-play-modal');
+const openModal  = () => howToPlayModal.classList.remove('hidden');
+const closeModal = () => howToPlayModal.classList.add('hidden');
+
+document.getElementById('how-to-play-btn').addEventListener('click', openModal);
+document.getElementById('modal-close-btn').addEventListener('click', closeModal);
+
+// Close on backdrop click (clicking outside modal-inner)
+howToPlayModal.addEventListener('click', (e) => {
+  if (e.target === howToPlayModal) closeModal();
+});
+
+// Close on Escape
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !howToPlayModal.classList.contains('hidden')) {
+    e.preventDefault();
+    closeModal();
+  }
+});
+
 document.getElementById('mute-btn').addEventListener('click', () => {
   if (typeof toggleMute === 'function') toggleMute();
 });
